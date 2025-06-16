@@ -36,7 +36,7 @@ import internalStrategyAnnotations from './InternalStrategyAnnotations';
 import sessionLabelsAnnotations from './SessionLabelsAnnotations';
 import killzonesAnnotations from './KillzonesAnnotations';
 import ictPriceLinesAnnotations from './IctPriceLinesAnnotations';
-import openingGapsAnnotations from './OpeningGapsAnnotations';
+// import openingGapsAnnotations from './OpeningGapsAnnotations'; // DISABLED - Converted to User Study
 // User Studies imports (controlled by ENABLE_USER_STUDIES killswitch)
 let UserStudyManager = null;
 let UserStudiesPanel = null;
@@ -828,8 +828,8 @@ function App() {
             ictPriceLinesAnnotations.initialize(sciChartSurfaceRefs.current, currentTimeframes, chartData);
             // console.log('ICT price lines annotations initialized');
             
-            // Initialize opening gaps annotations
-            openingGapsAnnotations.initialize(sciChartSurfaceRefs.current, currentTimeframes, chartData);
+            // Initialize opening gaps annotations - DISABLED - Converted to User Study
+            // openingGapsAnnotations.initialize(sciChartSurfaceRefs.current, currentTimeframes, chartData);
             // console.log('Opening gaps annotations initialized');
         }
     }, [timeframes]);
@@ -848,12 +848,12 @@ function App() {
         }
     }, [chartData, initialized]);
 
-    // Update opening gaps annotations when chart data changes
-    useEffect(() => {
-        if (initialized && openingGapsAnnotations) {
-            openingGapsAnnotations.updateData(chartData);
-        }
-    }, [chartData, initialized]);
+    // Update opening gaps annotations when chart data changes - DISABLED - Converted to User Study
+    // useEffect(() => {
+    //     if (initialized && openingGapsAnnotations) {
+    //         openingGapsAnnotations.updateData(chartData);
+    //     }
+    // }, [chartData, initialized]);
 
     // ICT Price Lines now uses simple internal session calculations - no session updates needed
 
@@ -2028,8 +2028,8 @@ function App() {
             // Clear ICT price lines annotations
             ictPriceLinesAnnotations.removeAllAnnotations();
             
-            // Clear opening gaps annotations
-            openingGapsAnnotations.destroy();
+            // Clear opening gaps annotations - DISABLED - Converted to User Study
+            // openingGapsAnnotations.destroy();
             
             // Clear user studies (if enabled)
             if (ENABLE_USER_STUDIES && UserStudyManager) {

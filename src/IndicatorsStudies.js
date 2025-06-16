@@ -4,7 +4,7 @@ import internalStrategyAnnotations from './InternalStrategyAnnotations';
 import sessionLabelsAnnotations from './SessionLabelsAnnotations';
 import killzonesAnnotations from './KillzonesAnnotations';
 import ictPriceLinesAnnotations from './IctPriceLinesAnnotations';
-import openingGapsAnnotations from './OpeningGapsAnnotations';
+// import openingGapsAnnotations from './OpeningGapsAnnotations'; // DISABLED - Converted to User Study
 import { FaQuestionCircle } from 'react-icons/fa';
 
 const IndicatorsStudies = ({ onClose, sessions = [] }) => {
@@ -22,8 +22,8 @@ const IndicatorsStudies = ({ onClose, sessions = [] }) => {
     // Get current ICT price lines annotation settings
     const [ictSettings, setIctSettings] = useState(ictPriceLinesAnnotations.getSettings());
     
-    // Get current opening gaps annotation settings
-    const [openingGapsSettings, setOpeningGapsSettings] = useState(openingGapsAnnotations.getSettings());
+    // Get current opening gaps annotation settings - DISABLED - Converted to User Study
+    // const [openingGapsSettings, setOpeningGapsSettings] = useState(openingGapsAnnotations.getSettings());
     
     // Handle Previous Day High/Low settings changes
     const handlePDHLEnabledChange = (enabled) => {
@@ -260,13 +260,14 @@ const IndicatorsStudies = ({ onClose, sessions = [] }) => {
     };
 
     // Handle Opening Gaps settings changes
-    const handleOpeningGapsSettingChange = (setting, value) => {
-        const newSettings = {
-            [setting]: value
-        };
-        setOpeningGapsSettings({ ...openingGapsSettings, ...newSettings });
-        openingGapsAnnotations.updateSettings(newSettings);
-    };
+    // Opening gaps settings handler - DISABLED - Converted to User Study
+    // const handleOpeningGapsSettingChange = (setting, value) => {
+    //     const newSettings = {
+    //         [setting]: value
+    //     };
+    //     setOpeningGapsSettings({ ...openingGapsSettings, ...newSettings });
+    //     openingGapsAnnotations.updateSettings(newSettings);
+    // };
 
     // Helper function to format timestamps
     const formatTimestamp = (timestamp) => {
@@ -1421,181 +1422,19 @@ const IndicatorsStudies = ({ onClose, sessions = [] }) => {
                         </div>
                     </div>
                 );
-            case 'openingGaps':
-                return (
-                    <div className="content-section">
-                        <h3>Opening Gaps and Event Horizon</h3>
-                        <div className="scrollable-content">
-                            {/* NDOG Settings */}
-                            <div className="session-indicator">
-                                <h4>New Day Opening Gaps (NDOG)</h4>
-                                <div className="indicator-controls">
-                                    <div className="control-row">
-                                        <label className="checkbox-label">
-                                            <input
-                                                type="checkbox"
-                                                checked={openingGapsSettings.showNDOG}
-                                                onChange={(e) => handleOpeningGapsSettingChange('showNDOG', e.target.checked)}
-                                            />
-                                            Show NDOG
-                                            <FaQuestionCircle 
-                                                className="help-icon"
-                                                title="Displays New Day Opening Gaps - gaps between daily sessions (~1 hour for CME futures). Shows colored boxes with top, bottom, and midpoint lines."
-                                            />
-                                        </label>
-                                        <label className="number-label">
-                                            Amount:
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                max="20"
-                                                value={openingGapsSettings.ndogAmount}
-                                                onChange={(e) => handleOpeningGapsSettingChange('ndogAmount', parseInt(e.target.value))}
-                                                className="number-picker"
-                                            />
-                                        </label>
-                                    </div>
-                                    <div className="control-row">
-                                        <label className="color-label">
-                                            Bullish NDOG:
-                                            <input
-                                                type="color"
-                                                value={openingGapsSettings.ndogBullishColor}
-                                                onChange={(e) => handleOpeningGapsSettingChange('ndogBullishColor', e.target.value)}
-                                                className="color-picker"
-                                            />
-                                            <FaQuestionCircle 
-                                                className="help-icon"
-                                                title="Color for NDOG gaps where price gaps up (current open > previous close)."
-                                            />
-                                        </label>
-                                        <label className="color-label">
-                                            Bearish NDOG:
-                                            <input
-                                                type="color"
-                                                value={openingGapsSettings.ndogBearishColor}
-                                                onChange={(e) => handleOpeningGapsSettingChange('ndogBearishColor', e.target.value)}
-                                                className="color-picker"
-                                            />
-                                            <FaQuestionCircle 
-                                                className="help-icon"
-                                                title="Color for NDOG gaps where price gaps down (current open < previous close)."
-                                            />
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* NWOG Settings */}
-                            <div className="session-indicator">
-                                <h4>New Week Opening Gaps (NWOG)</h4>
-                                <div className="indicator-controls">
-                                    <div className="control-row">
-                                        <label className="checkbox-label">
-                                            <input
-                                                type="checkbox"
-                                                checked={openingGapsSettings.showNWOG}
-                                                onChange={(e) => handleOpeningGapsSettingChange('showNWOG', e.target.checked)}
-                                            />
-                                            Show NWOG
-                                            <FaQuestionCircle 
-                                                className="help-icon"
-                                                title="Displays New Week Opening Gaps - gaps between Friday close and Sunday/Monday open (weekend gaps). Shows colored boxes with top, bottom, and midpoint lines."
-                                            />
-                                        </label>
-                                        <label className="number-label">
-                                            Amount:
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                max="20"
-                                                value={openingGapsSettings.nwogAmount}
-                                                onChange={(e) => handleOpeningGapsSettingChange('nwogAmount', parseInt(e.target.value))}
-                                                className="number-picker"
-                                            />
-                                        </label>
-                                    </div>
-                                    <div className="control-row">
-                                        <label className="color-label">
-                                            Bullish NWOG:
-                                            <input
-                                                type="color"
-                                                value={openingGapsSettings.nwogBullishColor}
-                                                onChange={(e) => handleOpeningGapsSettingChange('nwogBullishColor', e.target.value)}
-                                                className="color-picker"
-                                            />
-                                            <FaQuestionCircle 
-                                                className="help-icon"
-                                                title="Color for NWOG gaps where price gaps up (current open > previous close)."
-                                            />
-                                        </label>
-                                        <label className="color-label">
-                                            Bearish NWOG:
-                                            <input
-                                                type="color"
-                                                value={openingGapsSettings.nwogBearishColor}
-                                                onChange={(e) => handleOpeningGapsSettingChange('nwogBearishColor', e.target.value)}
-                                                className="color-picker"
-                                            />
-                                            <FaQuestionCircle 
-                                                className="help-icon"
-                                                title="Color for NWOG gaps where price gaps down (current open < previous close)."
-                                            />
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* EHPDA Settings */}
-                            <div className="session-indicator">
-                                <h4>Event Horizon Price Delivery Array (EHPDA)</h4>
-                                <div className="indicator-controls">
-                                    <div className="control-row">
-                                        <label className="checkbox-label">
-                                            <input
-                                                type="checkbox"
-                                                checked={openingGapsSettings.showEHPDA}
-                                                onChange={(e) => handleOpeningGapsSettingChange('showEHPDA', e.target.checked)}
-                                            />
-                                            Show EHPDA
-                                            <FaQuestionCircle 
-                                                className="help-icon"
-                                                title="Displays Event Horizon Price Delivery Array levels - intermediary levels between gaps that act as decision points for price direction according to ICT methodology."
-                                            />
-                                        </label>
-                                        <label className="checkbox-label">
-                                            <input
-                                                type="checkbox"
-                                                checked={openingGapsSettings.paneLabels}
-                                                onChange={(e) => handleOpeningGapsSettingChange('paneLabels', e.target.checked)}
-                                            />
-                                            Pane Labels
-                                            <FaQuestionCircle 
-                                                className="help-icon"
-                                                title="Shows 'EHPDA' text labels on the Event Horizon lines for easier identification."
-                                            />
-                                        </label>
-                                    </div>
-                                    <div className="control-row">
-                                        <label className="color-label">
-                                            EHPDA Color:
-                                            <input
-                                                type="color"
-                                                value={openingGapsSettings.ehpdaColor}
-                                                onChange={(e) => handleOpeningGapsSettingChange('ehpdaColor', e.target.value)}
-                                                className="color-picker"
-                                            />
-                                            <FaQuestionCircle 
-                                                className="help-icon"
-                                                title="Color for Event Horizon Price Delivery Array dashed lines."
-                                            />
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
+            // DISABLED - Opening Gaps converted to User Study
+            // case 'openingGaps':
+            //     return (
+            //         <div className="content-section">
+            //             <h3>Opening Gaps and Event Horizon</h3>
+            //             <div className="scrollable-content">
+            //                 <p style={{color: '#FFD700', fontWeight: 'bold', padding: '20px'}}>
+            //                     Opening Gaps functionality has been converted to a User Study.<br/>
+            //                     Access it through the "User Studies" panel instead.
+            //                 </p>
+            //             </div>
+            //         </div>
+            //     );
             default:
                 return (
                     <div className="content-section">
@@ -1649,12 +1488,13 @@ const IndicatorsStudies = ({ onClose, sessions = [] }) => {
                             >
                                 ICT PriceLines
                             </li>
-                            <li 
+                            {/* Opening Gaps menu item - DISABLED - Converted to User Study */}
+                            {/* <li 
                                 className={selectedItem === 'openingGaps' ? 'active' : ''}
                                 onClick={() => setSelectedItem('openingGaps')}
                             >
                                 Opening Gaps
-                            </li>
+                            </li> */}
                         </ul>
                     </div>
                     <div className="indicators-studies-content">

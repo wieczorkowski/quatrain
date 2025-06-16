@@ -55,6 +55,13 @@ const UserStudiesPanel = ({ onClose, sciChartSurface, candles, sessions = [] }) 
         console.log(`⚙️ [DEBUG] Calling UserStudyLifecycle.updateStudySettings...`);
         UserStudyLifecycle.updateStudySettings(studyId, newSettings);
         
+        // FIXED: Force immediate UI refresh for all setting changes
+        // This ensures the UI reflects changes immediately rather than waiting for data updates
+        setTimeout(() => {
+            refreshStudies();
+            setForceUpdateCounter(prev => prev + 1);
+        }, 10); // Very short delay to ensure the study has processed the update
+        
         // Verify the settings were actually updated
         setTimeout(() => {
             const verifySettings = UserStudyRegistry.getStudySettings(studyId);
@@ -63,19 +70,6 @@ const UserStudiesPanel = ({ onClose, sciChartSurface, candles, sessions = [] }) 
                 settingKey.split('.').reduce((obj, key) => obj?.[key], verifySettings) : 
                 verifySettings?.[settingKey]);
         }, 50);
-        
-        // Only refresh the UI for major changes (enabled/disabled), not for every setting change
-        // This prevents the color picker from disappearing during drag operations
-        if (settingKey === 'enabled' || settingKey === 'main.enabled') {
-            // For enable/disable changes, we need to refresh to show/hide the study correctly
-            setTimeout(() => {
-                refreshStudies();
-                // Also trigger force update for immediate UI feedback
-                setForceUpdateCounter(prev => prev + 1);
-            }, 100);
-        }
-        // For other settings (colors, numbers, etc.), don't force updates
-        // The getNestedValue fix should handle display updates naturally
     };
 
     const toggleStudyExpanded = (studyId) => {
