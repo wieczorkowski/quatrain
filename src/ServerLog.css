@@ -1,0 +1,117 @@
+﻿/* src/ServerLog.css */
+.server-log-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5); /* Semi-transparent backdrop */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000; /* Ensure this is above chart labels (z-index: 50) */
+}
+
+.server-log-panel {
+    background: #333; /* Dark background */
+    width: 90%;
+    height: 90%;
+    display: flex;
+    flex-direction: column;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.server-log-header {
+    padding: 12px 15px;
+    background: #222; /* Slightly darker header */
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #444;
+}
+
+.header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.server-log-icon {
+    max-width: 30px;
+    height: auto;
+    vertical-align: middle;
+}
+
+.server-log-header h2 {
+    margin: 0;
+    font-size: 1.3rem;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.close-button:hover {
+    color: #ff5555;
+}
+
+.server-log-content {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto; /* Scrollable content */
+    background: #444;
+    color: white;
+}
+
+.log-entry {
+    background: #555;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+}
+
+.log-entry-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.log-timestamp {
+    font-size: 0.8rem;
+    color: #aaa;
+}
+
+.copy-button {
+    background: none;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    padding: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+}
+
+.copy-button:hover {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.log-message {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: monospace;
+    font-size: 0.9rem;
+}

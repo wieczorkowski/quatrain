@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reference to NinjaTrader.Client.dll -->
+    <Reference Include="NinjaTrader.Client" Condition="Exists('$(ProgramFiles)\NinjaTrader 8\bin\NinjaTrader.Client.dll')">
+      <HintPath>$(ProgramFiles)\NinjaTrader 8\bin\NinjaTrader.Client.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    
+    <!-- Fallback to x86 program files -->
+    <Reference Include="NinjaTrader.Client" Condition="!Exists('$(ProgramFiles)\NinjaTrader 8\bin\NinjaTrader.Client.dll') AND Exists('$(ProgramFiles(x86))\NinjaTrader 8\bin\NinjaTrader.Client.dll')">
+      <HintPath>$(ProgramFiles(x86))\NinjaTrader 8\bin\NinjaTrader.Client.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project> 

@@ -1,0 +1,52 @@
+{
+    "name": "quatrain-charting-client",
+    "version": "0.1.0",
+    "private": true,
+    "main": "main.js",
+    "homepage": "./",
+    "dependencies": {
+        "@reduxjs/toolkit": "^2.7.0",
+        "electron-redux": "^2.0.0",
+        "luxon": "^3.6.1",
+        "react": "^18.2.0",
+        "react-colorful": "^5.6.1",
+        "react-dom": "^18.2.0",
+        "react-grid-layout": "^1.5.1",
+        "react-icons": "^5.5.0",
+        "react-redux": "^9.2.0",
+        "react-resizable": "^3.0.5",
+        "react-scripts": "5.0.1",
+        "rxjs": "^7.8.1",
+        "scichart": "^3.5.744",
+        "styled-components": "^6.1.8",
+        "web-vitals": "^4.2.4",
+        "ws": "^8.16.0"
+    },
+    "devDependencies": {
+        "concurrently": "^7.0.0",
+        "cross-env": "^7.0.3",
+        "electron": "^23.0.0",
+        "wait-on": "^6.0.0"
+    },
+    "scripts": {
+        "start": "cross-env BROWSER=none react-scripts start",
+        "build": "react-scripts build",
+        "test": "react-scripts test",
+        "eject": "react-scripts eject",
+        "electron": "electron .",
+        "dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 && npm run electron\"",
+        "electron-start": "npm run build && npm run electron"
+    },
+    "browserslist": {
+        "production": [
+            ">0.2%",
+            "not dead",
+            "not op_mini all"
+        ],
+        "development": [
+            "last 1 chrome version",
+            "last 1 firefox version",
+            "last 1 safari version"
+        ]
+    }
+}

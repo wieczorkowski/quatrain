@@ -1,0 +1,51 @@
+QUATRAIN CHARTING CLIENT - LAUNCHER INSTRUCTIONS
+
+========================================================
+Desktop Shortcuts (Recommended for Testers)
+========================================================
+
+You should now have TWO shortcuts on your desktop:
+
+🚀 "Launch Quatrain" 
+   - Use this for: First time launch or after code changes
+   - What it does: Builds the application and then launches it
+   - Takes longer but ensures you have the latest version
+
+⚡ "Restart Quatrain"
+   - Use this for: Quick restart after Quatrain crashes
+   - What it does: Launches using existing build (much faster)
+   - Use this when Quatrain crashes and you want to get back quickly
+
+========================================================
+Manual Launch (If shortcuts don't work)
+========================================================
+
+If the desktop shortcuts don't work, you can run these files directly
+from the Quatrain folder:
+
+1. Double-click "Launch Quatrain.bat" (full build + launch)
+2. Double-click "Restart Quatrain.bat" (quick restart)
+
+========================================================
+Troubleshooting
+========================================================
+
+• If Quatrain crashes: Use "Restart Quatrain" (faster)
+• If you get errors or old version: Use "Launch Quatrain" (rebuilds)
+• If nothing works: Contact Mark for assistance
+• Console windows will appear briefly - this is normal
+
+========================================================
+What the Console Windows Show
+========================================================
+
+When you launch Quatrain, you'll see a console window with:
+- "Building and launching Quatrain..." (for Launch)
+- "Restarting Quatrain..." (for Restart)
+- The window will stay open until Quatrain fully loads
+- You can safely close the console window once Quatrain opens
+
+========================================================
+Created: June 2025
+For: Quatrain Testing Team
+======================================================== 

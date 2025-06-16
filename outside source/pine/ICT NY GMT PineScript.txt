@@ -1,0 +1,200 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Shanxia
+
+//@version=5
+
+indicator("ICT NY Model", "ICT NY", overlay=true, max_lines_count=500)
+
+////////// INPUTS \\\\\\\\\\
+
+
+i_d4                = input.string      ("GMT-4", "Timezone", options=["GMT+0", "GMT+1", "GMT+2", "GMT+3","GMT+4","GMT+5","GMT+6","GMT+7","GMT+8","GMT+9","GMT+10","GMT+11","GMT+12",
+                                         "GMT-1", "GMT-2", "GMT-3","GMT-4","GMT-5","GMT-6","GMT-7","GMT-8","GMT-9","GMT-10","GMT-11","GMT-12"])
+
+s1                  = input.session     ("0830-0931:1234567", "", inline="i1")
+s2                  = input.session     ("0930-1131:1234567", "", inline="i2")
+s3                  = input.session     ("1330-1501:1234567", "", inline="i3")
+s4                  = input.session     ("1500-1601:1234567", "", inline="i4")
+
+
+c1                  = input.color       (color.new(color.silver, 85), "", inline="i1")
+c2                  = input.color       (color.new(color.silver, 92), "", inline="i2")
+c3                  = input.color       (color.new(color.aqua, 92), "", inline="i3")
+c4                  = input.color       (color.new(color.aqua, 85), "", inline="i4")
+
+
+i_bool1             = input.bool        (true, "NY 00.00am", group="Opens (Local Time)", inline="1")
+i_bool2             = input.bool        (true, "NY 8.30am  ", group="Opens (Local Time)", inline="2")
+i_bool3             = input.bool        (true, "NY 9.30am  ", group="Opens (Local Time)", inline="3")
+i_bool4             = input.bool        (true, "London Open", group="Opens (Local Time)", inline="4")
+
+
+i_linecol1          = input.color       (#d40c0c, "", group="Opens (Local Time)", inline="1")
+i_txtcol            = input.color       (#676767, "Text color", group="Opens (Local Time)", inline="1")
+i_linecol2          = input.color       (#fbc02d, "", group="Opens (Local Time)", inline="2")
+i_llh               = input.bool        (true, "London H/L", group="Opens (Local Time)", inline="2")
+i_lonhl             = input.color       (#a2a2a2, "", group="Opens (Local Time)", inline="2")
+i_linecol3          = input.color       (#00cd88, "", group="Opens (Local Time)", inline="3")
+i_linecol4          = input.color       (#008fff, "", group="Opens (Local Time)", inline="4")
+lonr                = input.session     ("0300-0700:1234567", "London")
+i_linewidth         = input.int         (1, "Linewidth", 0, 5, inline="in0")
+i_vstyle            = input.string      ("Dashed", "Style", options=["Solid", "Dotted", "Dashed"], inline="in1")
+i_linestyle         = input.string      ("Solid", " ", options=["Solid", "Dotted", "Dashed"], inline="in1")
+i_dev               = input.bool        (false, 'Deviations', inline='x1')
+i_devno             = input.int         (2 , "", minval=1, inline='x1')
+
+
+
+////////// VARIABLES \\\\\\\\\\
+
+ny830               = time("1", s1, i_d4)
+ny930               = time("1", s2, i_d4)
+ny130               = time("1", s3, i_d4)
+ny300               = time("1", s4, i_d4)
+
+i_time              = '0000-0001:1234567'
+i_time2             = '0830-0831:1234567'
+i_time3             = '0930-0931:1234567'
+i_time4             = '0800-0801:1234567'
+
+linestyle           = i_linestyle ==    "Solid" ? line.style_solid : i_linestyle == "Dotted" ? line.style_dotted : line.style_dashed
+vstyle              = i_vstyle    ==    "Solid" ? line.style_solid : i_vstyle == "Dotted" ? line.style_dotted : line.style_dashed
+
+
+////////// FUNCTION DECLARATIONS \\\\\\\\\\
+
+
+in_session(sess) =>
+    not na(time(timeframe.period, sess, i_d4))
+
+start_time(sess) =>
+    int startTime = na
+    startTime := in_session(sess) and not in_session(sess)[1] ? time : startTime[1]
+    startTime
+
+is_new_session(res, sess) =>
+    t = time(res, sess, i_d4)
+    na(t[1]) and not na(t) or t[1] < t
+
+_hline(StartTime, EndTime, Price, Color, Style, Width) =>
+    return_1 = line.new(StartTime, Price, EndTime, Price, xloc=xloc.bar_time, extend=extend.none, color=Color, style=Style, width=Width)
+
+
+f_vline(a, f, b, d, e, sess) => 
+    var line fl1 = na
+    var line fl2 = na
+    var linefill lf1 = na
+    st_vl = timestamp(i_d4, year, month, sess, a, f, 00)
+    en_vl = timestamp(i_d4, year, month, sess, b, e, 00)
+    fl1 := line.new(st_vl, high, st_vl, low, xloc.bar_time, extend.both, color.new(color.white, 100), line.style_solid, 1)
+    line.delete(fl1[1])
+    fl2 := line.new(en_vl, high, en_vl, low, xloc.bar_time, extend.both, color.new(color.white, 100), line.style_solid, 1)
+    line.delete(fl2[1])
+    lf1 := linefill.new(fl1, fl2, d)
+    linefill.delete(lf1[1])
+    for i = 0 to 100
+        if time > line.get_x1(fl2[i])
+            line.delete(fl2[i])
+            line.delete(fl1[i])
+
+
+openline(sess, timezone, col, txt, st, boo) =>
+    _open = request.security(syminfo.tickerid, "1", open, barmerge.gaps_on, barmerge.lookahead_on)
+    nymid= time("1", sess, timezone)
+    var openprice = 0.0
+    var label lb = na
+    var line lne = na
+    if nymid
+        if not nymid[1]
+            openprice := _open
+        else
+            openprice := math.max(_open, openprice)
+    if openprice != openprice[1] and boo
+        if barstate.isconfirmed
+            line.set_x2(lne, nymid)
+            line.set_extend(lne, extend.none)
+            lne := line.new(nymid, openprice, nymid + 86400000 , openprice, xloc.bar_time, extend.none, col, st, i_linewidth)
+            lb  := label.new(nymid + 86400000, openprice, txt, xloc.bar_time, yloc.price, na, label.style_none, i_txtcol)
+
+
+
+lrange(kz, bdcol, col1)=>
+    sesh = is_new_session('1440', kz)
+    float kzlow = na
+    float kzhigh = na
+    bline = line(na)
+    bline2 = line(na)
+    lab1 = label(na)
+    lab2 = label(na)
+    kzstart = start_time(kz) + 19800000 
+    labst = start_time(kz) + 46800000 
+    kzlow := sesh ? low : in_session(kz) ? math.min(low, kzlow[1]) : na
+    kzhigh := sesh ? high : in_session(kz) ? math.max(high, kzhigh[1]) : na
+    devdiff = kzhigh[1] - kzlow[1]
+
+    if in_session(kz)
+        if in_session(kz)[1]
+            line.delete(bline[1])
+            line.delete(bline2[1])
+        if low < kzlow
+            kzlow := low
+            kzlow
+        if high > kzhigh
+            kzhigh := high
+            kzhigh
+
+        bline := line.new(kzstart, kzhigh, kzstart + 27000000, kzhigh, xloc.bar_time, extend.none, bdcol, line.style_solid, 4)
+        bline
+        bline2 := line.new(kzstart, kzlow, kzstart + 27000000, kzlow, xloc.bar_time, extend.none, bdcol, line.style_solid, 4)
+        bline2
+        lab1 := label.new(labst, kzhigh, "L • High", xloc.bar_time, yloc.price, color.new(#ffffff, 100), label.style_label_down, i_txtcol)
+        label.delete(lab1[1])
+        lab2 := label.new(labst, kzlow, "L • Low", xloc.bar_time, yloc.price, color.new(#ffffff, 100), label.style_label_up, i_txtcol)
+        label.delete(lab2[1])
+    tz = time - time[1]
+    if i_dev and not in_session(kz) and in_session(kz)[1]
+        for s = 1 to i_devno by 1
+            _hline(kzstart, kzstart + 27000000, kzhigh[1] + devdiff * s, col1, line.style_solid, 3)
+            _hline(kzstart, kzstart + 27000000, kzlow[1] - devdiff * s, col1, line.style_solid, 3)
+
+
+hf(x, a, b, c) =>
+    y = line(na)
+    z = line(na)
+    lf = linefill(na)
+    st = start_time(b)
+    if in_session(b)
+        y := line.new(st, high, st, low, xloc.bar_time, extend.both, color.new(#ffffff, 100))
+        z := line.new(st + c , high, st + c , low, xloc.bar_time, extend.both, color.new(#ffffff, 100))
+        lf := linefill.new(z, y, a)
+        line.delete(y[1])
+        line.delete(z[1])
+        linefill.delete(lf[1])
+
+
+////////// FUNCTIONS \\\\\\\\\\
+
+
+if timeframe.isintraday and timeframe.multiplier <= 30
+    openline(i_time, i_d4, i_linecol1, "00.00", vstyle, i_bool1)
+    openline(i_time2, i_d4, i_linecol2, "08.30", linestyle, i_bool2)
+    openline(i_time3, i_d4, i_linecol3, "09.30", linestyle, i_bool3)
+    openline(i_time4, "GMT+1", i_linecol4, "London", linestyle, i_bool4)
+    
+    if i_llh
+
+        lrange(lonr, i_lonhl, i_lonhl)
+
+    hf(ny830, c1, s1, 3600000)
+    hf(ny930, c2, s2, 7200000)
+    hf(ny130, c3, s3, 5400000)
+    hf(ny300, c4, s4, 3600000)
+    
+    f_vline(08, 30, 09, c1, 30, dayofmonth)
+    f_vline(09, 30, 11, c2, 30, dayofmonth)
+    f_vline(13, 30, 15, c3, 00, dayofmonth)
+    f_vline(15, 00, 16, c4, 00, dayofmonth)
+    f_vline(08, 30, 09, c1, 30, dayofmonth + 1)
+    f_vline(09, 30, 11, c2, 30, dayofmonth + 1)
+    f_vline(13, 30, 15, c3, 00, dayofmonth + 1)
+    f_vline(15, 00, 16, c4, 00, dayofmonth + 1)

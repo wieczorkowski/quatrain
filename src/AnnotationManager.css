@@ -1,0 +1,365 @@
+/* src/AnnotationManager.css */
+.annotation-manager-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5); /* Semi-transparent backdrop */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.annotation-manager-panel {
+    background: #333; /* Dark background */
+    width: 90%;
+    height: 90%;
+    display: flex;
+    flex-direction: column;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.annotation-manager-header {
+    padding: 12px 15px;
+    background: #222; /* Slightly darker header */
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #444;
+}
+
+.header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.annotation-manager-icon {
+    max-width: 30px;
+    height: auto;
+    vertical-align: middle;
+}
+
+.annotation-manager-header h2 {
+    margin: 0;
+    font-size: 1.3rem;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.close-button:hover {
+    color: #ff5555;
+}
+
+.annotation-manager-content {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto; /* Scrollable content */
+    background: #444;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    position: relative; /* For absolute positioning of the controls */
+}
+
+.no-annotations {
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
+    color: #aaa;
+    font-size: 0.9rem;
+}
+
+.annotation-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1; /* Take up available space */
+    margin-bottom: 70px; /* Space for controls at bottom */
+}
+
+.annotation-entry {
+    background: #555;
+    padding: 10px;
+    border-radius: 4px;
+    display: grid;
+    grid-template-columns: 250px 1fr 40px;
+    gap: 10px;
+    align-items: start;
+    border-left: 4px solid #7d7; /* Default color, will be overridden by inline style */
+    font-size: 0.85rem;
+}
+
+.annotation-entry:nth-child(odd) {
+    background: #5a5a5a;
+}
+
+/* Strategy annotation styles */
+.strategy-annotation {
+    padding: 6px 10px;
+    grid-template-columns: 320px 1fr 40px;
+    background-color: #4a4a4a !important; /* Always use darker background for strategy annotations */
+    margin-left: 10px; /* Indentation for strategy annotations */
+    border-left-width: 2px; /* Thinner left border */
+}
+
+/* Make sure strategy annotations use the same background color regardless of position */
+.annotation-entry.strategy-annotation:nth-child(odd) {
+    background-color: #4a4a4a !important;
+}
+
+.annotation-type-container.compact {
+    padding: 0;
+}
+
+.annotation-details.compact {
+    padding: 0;
+}
+
+.strategy-indicator {
+    background: #555 !important;
+    color: #aaa !important;
+    font-size: 0.7rem;
+    padding: 2px 5px;
+    border-radius: 3px;
+    display: inline-block;
+    margin-left: 5px;
+    font-style: italic;
+}
+
+/* Removed color coding based on annotation types since we're using actual colors */
+
+.annotation-type-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.annotation-type {
+    font-weight: bold;
+    color: #fff;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.annotation-coordinates {
+    font-size: 0.75rem;
+    color: #ccc;
+    margin-top: 4px;
+    margin-bottom: 4px;
+    white-space: nowrap;
+}
+
+.annotation-timeframe {
+    background: #666;
+    padding: 3px 6px;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 0.8rem;
+}
+
+.annotation-timeframe:empty {
+    display: none;
+}
+
+.annotation-details {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.annotation-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 2px;
+}
+
+.annotation-meta span {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    color: #ccc;
+}
+
+.annotation-id {
+    font-family: monospace;
+    word-break: break-all;
+    color: #aaa;
+    font-size: 0.75rem;
+    background: rgba(0, 0, 0, 0.15);
+    padding: 4px 6px;
+    border-radius: 4px;
+}
+
+.annotation-date {
+    font-size: 0.75rem;
+    color: #aaa;
+    font-style: italic;
+}
+
+.annotation-select {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.annotation-select input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #77d;
+}
+
+/* Area for controls */
+.annotation-controls {
+    position: fixed;
+    bottom: 5%;
+    left: 5%;
+    right: 5%;
+    background: #333;
+    height: 60px;
+    border-top: 1px solid #444;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 15px;
+    border-radius: 0 0 8px 8px;
+}
+
+.control-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.delete-button, .delete-all-button {
+    padding: 6px 15px;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+.delete-button {
+    background-color: #664;
+    color: white;
+}
+
+.delete-button:hover {
+    background-color: #886;
+}
+
+.delete-all-button {
+    background-color: #844;
+    color: white;
+}
+
+.delete-all-button:hover {
+    background-color: #a66;
+}
+
+.delete-button:disabled, .delete-all-button:disabled {
+    background-color: #555;
+    color: #777;
+    cursor: not-allowed;
+}
+
+.selection-status {
+    color: #aaa;
+    font-size: 0.85rem;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+/* Confirmation Dialog */
+.confirmation-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.confirmation-dialog {
+    background: #333;
+    padding: 20px;
+    border-radius: 6px;
+    width: 400px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.confirmation-message {
+    font-size: 1.1rem;
+    color: white;
+    text-align: center;
+    padding: 10px;
+}
+
+.confirmation-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+.cancel-button, .confirm-button {
+    padding: 8px 25px;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.cancel-button {
+    background-color: #555;
+    color: white;
+}
+
+.cancel-button:hover {
+    background-color: #666;
+}
+
+.confirm-button {
+    background-color: #774;
+    color: white;
+}
+
+.confirm-button:hover {
+    background-color: #996;
+}
+
+.timeframe-indicator {
+    background: #666 !important;
+    color: white !important;
+    font-weight: bold;
+    font-size: 0.7rem;
+    padding: 2px 5px;
+    border-radius: 3px;
+    display: inline-block;
+} 

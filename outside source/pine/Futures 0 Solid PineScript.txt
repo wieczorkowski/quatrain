@@ -1,0 +1,563 @@
+// © Infinity_Trading_
+// Last Modified: 6/1/2022
+
+//@version=5
+indicator(title="Futures Exchange Sessions 2.0", shorttitle="_Futures", overlay=true, max_boxes_count=200)
+
+// Purpose: Successor to Futures Exchange Sessions indicator. Completely rebuilt code from the ground up.
+//
+//          Displays Futures sessions as boxes that dynamically expand with time and new highs/lows in a session. Box session are labeled for easy visibility.
+//          Now includes previous daily high and low lines + labels for each of the previous three days. Lines display on daily timeframe.
+//          Midnight EST and 8:30 AM EST horiztonal lines now stop at current bar or end of Futures trading day. Time lines are displayed for previous days.
+//          The number of days back to display boxes and time lines are controllable in settings.
+
+// Usage:   All previous days highs & lows lines are independently configurable by on/off, color, style, width, label on/off, label text color.
+//          Ability to move time line labels to the right to allow unobstructed views of candles.
+//          Horizontal time lines can be adjusted by on/off, color, style, width, label on/off, label text color.
+//          Session boxes can be customized by fill color, border color, border width, border style, or toggled on/off.
+//          The box text can be changed by color, size, vertical alignment, or horizontal alignment.
+
+
+// Notes:
+//          To turn off box session text set opacity to 0%
+//          Boxes and time lines only display when timeframe is <= 30 minute
+
+
+// https://www.tradingview.com/pine-script-reference/
+
+///////////////////////////////////////////////////////////////////////////////// INPUTS
+
+
+//------------------------------------
+// LINES
+//------------------------------------
+
+var string GPL = "Horizontal Price Lines"
+i_line_label_toggle = input.bool(defval=false, title=" Labels On/Off", group=GPL, inline="line_labels")
+c_tooltip_right_mov = "If the futures market is closed (every weekend & 5:00-6:00 pm EST weekdays) then the label right movement setting won't have any visible impact. Please wait for the market to open again and the right movement setting will resume. The reason the label doesn't move right during market closed hours is because the chart is removing those hours and thus something cannot be displayed during those times."
+i_labels_right_mov = input.int(defval=0, minval=0, step=1, title="➕ Right Movement", group=GPL, inline="line_labels", tooltip=c_tooltip_right_mov)
+
+
+i_prev_days_high_toggle = input.bool(defval=false, title="", group=GPL, inline="prev_high")
+i_prev_days_high_line_color = input.color(defval=color.new(#0984e3, 0), title=" Previous Days High", group=GPL, inline="prev_high") // electron blue
+i_prev_days_high_line_style = input.string(defval="solid (─)", title="", options=["solid (─)", "dotted (┈)", "dashed (╌)"], group=GPL, inline="prev_high")
+i_prev_days_high_line_width = input.int(defval=2, title="   ", minval=1, maxval=20, group=GPL, inline="prev_high2")
+i_prev_days_high_text_color = input.string(defval="Black", title="", options=["Black", "White"], group=GPL, inline="prev_high2")
+
+i_prev_days_low_toggle = input.bool(defval=false, title="", group=GPL, inline="prev_low")
+i_prev_days_low_line_color = input.color(defval=color.new(#ff793f, 0), title=" Previous Days Low ", group=GPL, inline="prev_low") // synthetic pumpkin
+i_prev_days_low_line_style = input.string(defval="solid (─)", title="", options=["solid (─)", "dotted (┈)", "dashed (╌)"], group=GPL, inline="prev_low")
+i_prev_days_low_line_width = input.int(defval=2, title="   ", minval=1, maxval=20, group=GPL, inline="prev_low2")
+i_prev_days_low_text_color = input.string(defval="Black", title="", options=["Black", "White"], group=GPL, inline="prev_low2")
+
+
+
+i_two_days_high_toggle = input.bool(defval=false, title="", group=GPL, inline="two_high")
+i_two_days_high_line_color = input.color(defval=color.new(#0984e3, 0), title="Two Days Ago High ", group=GPL, inline="two_high") // electron blue
+i_two_days_high_line_style = input.string(defval="solid (─)", title="", options=["solid (─)", "dotted (┈)", "dashed (╌)"], group=GPL, inline="two_high")
+i_two_days_high_line_width = input.int(defval=2, title="   ", minval=1, maxval=20, group=GPL, inline="two_high2")
+i_two_days_high_text_color = input.string(defval="Black", title="", options=["Black", "White"], group=GPL, inline="two_high2")
+
+i_two_days_low_toggle = input.bool(defval=false, title="", group=GPL, inline="two_low")
+i_two_days_low_line_color = input.color(defval=color.new(#ff793f, 0), title="Two Days Ago Low ", group=GPL, inline="two_low") // synthetic pumpkin
+i_two_days_low_line_style = input.string(defval="solid (─)", title="", options=["solid (─)", "dotted (┈)", "dashed (╌)"], group=GPL, inline="two_low")
+i_two_days_low_line_width = input.int(defval=2, title="   ", minval=1, maxval=20, group=GPL, inline="two_low2")
+i_two_days_low_text_color = input.string(defval="Black", title="", options=["Black", "White"], group=GPL, inline="two_low2")
+
+
+
+i_three_days_high_toggle = input.bool(defval=false, title="", group=GPL, inline="three_high")
+i_three_days_high_line_color = input.color(defval=color.new(#0984e3, 0), title="Three Days Ago High", group=GPL, inline="three_high") // electron blue
+i_three_days_high_line_style = input.string(defval="solid (─)", title="", options=["solid (─)", "dotted (┈)", "dashed (╌)"], group=GPL, inline="three_high")
+i_three_days_high_line_width = input.int(defval=2, title="   ", minval=1, maxval=20, group=GPL, inline="three_high2")
+i_three_days_high_text_color = input.string(defval="Black", title="", options=["Black", "White"], group=GPL, inline="three_high2")
+
+i_three_days_low_toggle = input.bool(defval=false, title="", group=GPL, inline="three_low")
+i_three_days_low_line_color = input.color(defval=color.new(#ff793f, 0), title="Three Days Ago Low", group=GPL, inline="three_low") // synthetic pumpkin
+i_three_days_low_line_style = input.string(defval="solid (─)", title="", options=["solid (─)", "dotted (┈)", "dashed (╌)"], group=GPL, inline="three_low")
+i_three_days_low_line_width = input.int(defval=2, title="   ", minval=1, maxval=20, group=GPL, inline="three_low2")
+i_three_days_low_text_color = input.string(defval="Black", title="", options=["Black", "White"], group=GPL, inline="three_low2")
+
+
+
+var string GTL = "Horizontal Time Lines"
+
+i_midnight_toggle = input.bool(defval=false, title="", group=GTL, inline="midnight")
+i_midnight_line_color = input.color(defval=color.new(#131722, 0), title=" Midnight EST Open", group=GTL, inline="midnight") // off black
+i_midnight_line_style = input.string(defval="dashed (╌)", title="", options=["solid (─)", "dotted (┈)", "dashed (╌)"], group=GTL, inline="midnight")
+i_midnight_line_width = input.int(defval=2, title="   ", minval=1, maxval=20, group=GTL, inline="midnight2")
+i_midnight_text_color = input.string(defval="White", title="", options=["Black", "White"], group=GTL, inline="midnight2")
+
+i_eight_thirty_toggle = input.bool(defval=false, title="", group=GTL, inline="eight_thirty")
+i_eight_thirty_line_color = input.color(defval=color.new(#747d8c, 0), title=" 8:30 AM EST Open", group=GTL, inline="eight_thirty") // bay wharf
+i_eight_thirty_line_style = input.string(defval="dashed (╌)", title="", options=["solid (─)", "dotted (┈)", "dashed (╌)"], group=GTL, inline="eight_thirty")
+i_eight_thirty_line_width = input.int(defval=2, title="   ", minval=1, maxval=20, group=GTL, inline="eight_thirty2")
+i_eight_thirty_text_color = input.string(defval="Black", title="", options=["Black", "White"], group=GTL, inline="eight_thirty2")
+
+
+//------------------------------------
+// Boxes
+//------------------------------------
+
+var string GB = "Future Exchange Boxes"
+
+c_tooltip_2 = "If the user increments/decrements this integer field and nothing happens, that is because the user is moving throught a weekend or holiday. Please continue incrementing/decrementing and after 2-3 clicks the user will see backgrounds/labels appear or disappear. The algorithm for Days Back is counting every 24-hour period which is why this behavior occurs."
+i_display_days_back = input.int(defval=15, minval=1, maxval=80, title="Display Only 🔢 Days Back", group=GB, tooltip=c_tooltip_2)
+
+
+i_asian_box_toggle = input.bool(defval=false, title="Asian Session ", group=GB, inline="asian_session")
+i_asian_box_bgcolor = input.color(defval=color.new(#ffffff, 80), title="", group=GB, inline="asian_session")
+i_asian_box_border_color = input.color(defval=color.new(#131722, 80), title="  Asian Border  ", group=GB, inline="asian_session2") 
+i_asian_box_border_width = input.int(defval=2, title="", minval=1, maxval=20, group=GB, inline="asian_session2")
+i_asian_box_border_style = input.string(defval="solid (─)", title="", options=["solid (─)", "dotted (┈)", "dashed (╌)"], group=GB, inline="asian_session2")
+
+i_london_box_toggle = input.bool(defval=false, title="London Session", group=GB, inline="london_session")
+i_london_box_bgcolor = input.color(defval=color.new(#5b9cf6, 80), title="", group=GB, inline="london_session")
+i_london_box_border_color = input.color(defval=color.new(#131722, 80), title="  London Border ", group=GB, inline="london_session2") 
+i_london_box_border_width = input.int(defval=2, title="", minval=1, maxval=20, group=GB, inline="london_session2")
+i_london_box_border_style = input.string(defval="solid (─)", title="", options=["solid (─)", "dotted (┈)", "dashed (╌)"], group=GB, inline="london_session2")
+
+i_ny_box_toggle = input.bool(defval=false, title="NY Session  ", group=GB, inline="ny_session")
+i_ny_box_bgcolor = input.color(defval=color.new(#f7525f, 80), title="", group=GB, inline="ny_session")
+i_ny_box_border_color = input.color(defval=color.new(#131722, 80), title="  NY Border   ", group=GB, inline="ny_session2") 
+i_ny_box_border_width = input.int(defval=2, title="", minval=1, maxval=20, group=GB, inline="ny_session2")
+i_ny_box_border_style = input.string(defval="solid (─)", title="", options=["solid (─)", "dotted (┈)", "dashed (╌)"], group=GB, inline="ny_session2")
+
+// Text in boxes
+var string GT = "Box Text"
+i_ny_box_text_color = input.color(defval=color.new(#ffffff, 60), title=" Text Style ", group=GT, inline="ny_session3")
+i_ny_box_text_size = input.string(defval="Normal", title="", options=["Tiny", "Small", "Normal", "Large", "Huge", "Auto"], group=GT, inline="ny_session3")
+i_ny_box_textv_v = input.string(defval="Top", title=" Text Position", options=["Top", "Center", "Bottom"], group=GT, inline="ny_session4")
+i_ny_box_text_h = input.string(defval="Left", title="", options=["Left", "Center", "Right"], group=GT, inline="ny_session4")
+
+
+//------------------------------------
+// CONTANTS
+//------------------------------------
+
+c_london_open_time_est  = '0300-0301'
+c_london_close_time_est = '1130-1131'
+c_ny_open_time_est      = '0930-0931'
+c_ny_close_time_est     = '1600-1601'
+c_asia_open_time_est    = '1900-1901'
+c_asia_close_time_est   = '0300-0301'
+
+c_asian_session_est     = '1900-0259'
+c_london_session_est    = '0300-1129'
+c_new_york_session_est  = '0930-1559'
+
+c_minutes_futures_trading_day = 1380
+c_seconds_futures_trading_day = 82800
+c_milliseconds_in_day = 24 * 60 * 60 * 1000
+
+//------------------------------------
+// VARIABLES
+//------------------------------------
+
+// See if a new calendar day started on the intra-day time frame
+newDayStart = dayofmonth(time, "America/New_York") != dayofmonth(time, "America/New_York")[1] and timeframe.isintraday
+
+newDayStartAsian = dayofmonth(time, "Asia/Shanghai") != dayofmonth(time, "Asia/Shanghai")[1] and timeframe.isintraday
+
+newDayStartLondon = dayofmonth(time, "Europe/London") != dayofmonth(time, "Europe/London")[1] and timeframe.isintraday
+
+///////////////////////////////////////////////////////////////////////////////// DAYS BACK
+
+// Find the last bar on the chart
+lastBarDate = timestamp(year(timenow), month(timenow), dayofmonth(timenow), hour(timenow), minute(timenow), second(timenow))
+// Find the current bar that is being processed
+thisBarDate = timestamp(year, month, dayofmonth, hour, minute, second)
+// Find the number of days between these two bars
+daysLeft = math.floor((lastBarDate - thisBarDate) / c_milliseconds_in_day)
+// Only display the number of days specified in Input Settings
+in_days_back_range = daysLeft < i_display_days_back
+
+
+///////////////////////////////////////////////////////////////////////////////// HELPER FUNCTIONS
+
+
+// Function the converts string inputs to line style code
+line_style_function(input_var) =>
+    switch input_var
+        "dotted (┈)" => line.style_dotted
+        "dashed (╌)" => line.style_dashed
+        => line.style_solid
+
+// Function that converts the words black/white to their code equivalents
+text_color_function(string_color) =>
+    switch string_color
+        "Black" => color.black
+        "White" => color.white
+        => color.black
+
+// Function that converts string inputs to text size code
+text_size_function(string_size) =>
+    switch string_size
+        "Tiny" => size.tiny
+        "Small" => size.small
+        "Normal" => size.normal
+        "Large" => size.large
+        "Huge" => size.huge
+        "Auto" => size.auto
+
+// Function that converts string inputs to text vertical alignment code
+text_vertical_alignment_function(string_v) =>
+    switch string_v
+        "Top" => text.align_top
+        "Center" => text.align_center
+        "Bottom" => text.align_bottom
+
+// Function that converts string inputs to text horizontal alignment code
+text_horizontal_alignment_function(string_h) =>
+    switch string_h
+        "Left" => text.align_left
+        "Center" => text.align_center
+        "Right" => text.align_right
+
+// Function that draws line and label at specified level
+custom_previous_high_low_lines_labels(line_toggle, label_toggle, line_x1, line_y1, line_x2, line_y2, line_color, line_sytle, line_width, label_x, label_text_color, label_tooltip) =>
+    label line_label = na
+    if line_toggle
+        if barstate.islast
+            line.new(x1=line_x1, y1=line_y1, x2=line_x2, y2=line_y2, xloc=xloc.bar_time, color=line_color, style=line_sytle, width=line_width)
+            if label_toggle
+                line_label := label.new(x=label_x, y=line_y1, text=str.tostring(line_y1), xloc=xloc.bar_time, color=line_color, textcolor=label_text_color, tooltip=label_tooltip)
+                label.delete(line_label[1])
+
+
+// Functions for Security calls to get time or price on the number of periods back specified
+timePeriod(tf, period) => request.security(syminfo.tickerid, tf, time[period])
+highPeriod(tf, period) => request.security(syminfo.tickerid, tf, high[period])
+lowPeriod(tf, period) => request.security(syminfo.tickerid, tf, low[period])
+openPeriod(tf, period) => request.security(syminfo.tickerid, tf, open[period])
+
+
+///////////////////////////////////////////////////////////////////////////////// PREVIOUS DAYS HIGH & LOW LINES
+
+// Move timebased labels right
+dt = time + i_labels_right_mov * (time - time[1])
+
+
+// Line style function variables
+line_style_prev_high = line_style_function(i_prev_days_high_line_style)
+line_style_prev_low = line_style_function(i_prev_days_low_line_style)
+line_style_two_high = line_style_function(i_two_days_high_line_style)
+line_style_two_low = line_style_function(i_two_days_low_line_style)
+line_style_three_high = line_style_function(i_three_days_high_line_style)
+line_style_three_low = line_style_function(i_three_days_low_line_style)
+
+
+// Text color function variables
+prev_days_high_text_color = text_color_function(i_prev_days_high_text_color)
+prev_days_low_text_color = text_color_function(i_prev_days_low_text_color)
+two_days_high_text_color = text_color_function(i_two_days_high_text_color)
+two_days_low_text_color = text_color_function(i_two_days_low_text_color)
+three_days_high_text_color = text_color_function(i_three_days_high_text_color)
+three_days_low_text_color = text_color_function(i_three_days_low_text_color)
+
+
+// Previous Days High
+custom_previous_high_low_lines_labels(i_prev_days_high_toggle, i_line_label_toggle, timePeriod("D", 1), highPeriod("D", 1), time, highPeriod("D", 1), i_prev_days_high_line_color, line_style_prev_high, i_prev_days_high_line_width, dt, prev_days_high_text_color, "Prev. Days High")
+
+
+// Previous Days Low
+custom_previous_high_low_lines_labels(i_prev_days_low_toggle, i_line_label_toggle, timePeriod("D", 1), lowPeriod("D", 1), time, lowPeriod("D", 1), i_prev_days_low_line_color, line_style_prev_low, i_prev_days_low_line_width, dt, prev_days_low_text_color, "Prev. Days Low")
+
+
+// Two Days Ago High
+custom_previous_high_low_lines_labels(i_two_days_high_toggle, i_line_label_toggle, timePeriod("D", 2), highPeriod("D", 2), time, highPeriod("D", 2), i_two_days_high_line_color, line_style_two_high, i_two_days_high_line_width, dt, two_days_high_text_color, "Two Days Ago High")
+
+// Two Days Ago Low
+custom_previous_high_low_lines_labels(i_two_days_low_toggle, i_line_label_toggle, timePeriod("D", 2), lowPeriod("D", 2), time, lowPeriod("D", 2), i_two_days_low_line_color, line_style_two_low, i_two_days_low_line_width, dt, two_days_low_text_color, "Two Days Ago Low")
+
+
+// Three Days Ago High
+custom_previous_high_low_lines_labels(i_three_days_high_toggle, i_line_label_toggle, timePeriod("D", 3), highPeriod("D", 3), time, highPeriod("D", 3), i_three_days_high_line_color, line_style_three_high, i_three_days_high_line_width, dt, three_days_high_text_color, "Three Days Ago High")
+
+// Three Days Ago Low
+custom_previous_high_low_lines_labels(i_three_days_low_toggle, i_line_label_toggle, timePeriod("D", 3), lowPeriod("D", 3), time, lowPeriod("D", 3), i_three_days_low_line_color, line_style_three_low, i_three_days_low_line_width, dt, three_days_low_text_color, "Three Days Ago Low")
+
+
+
+///////////////////////////////////////////////////////////////////////////////// MIDNIGHT OPEN LINE
+
+line_style_midnight_open = line_style_function(i_midnight_line_style)
+midnight_text_color = text_color_function(i_midnight_text_color)
+
+// Time period variables
+midnight_window = (hour(time, "America/New_York") == 0) and (minute(time) == 0)
+midnight_timespan_est = time(timeframe.period, '0001-1659', "America/New_York")
+
+// Line defaults
+var line line_midnight = na
+var label label_midnight = na
+
+
+// Only display the specified number of days back
+if in_days_back_range
+
+    // Draw line starting at the midnight open EST candle
+    if i_midnight_toggle and timeframe.isminutes and timeframe.multiplier < 60
+    
+        // If a new day starts, set the high and low to that bar's data. Else
+        // during the day track the highest high and lowest low.
+        // Used London new day time because NY new day is the time we are looking for. Using NY new day wouldn't work.
+        if newDayStartLondon
+            // On new day create blank line but with specified style
+            line_midnight := line.new(x1=na, y1=na, x2=na, y2=na, color=i_midnight_line_color, style=line_style_midnight_open, width=i_midnight_line_width)
+        else
+            // At exactly midnight EST 
+            if midnight_window
+                // Update line with current x's and y's
+                line.set_x1(line_midnight, bar_index)
+                line.set_y1(line_midnight, open)
+                line.set_x2(line_midnight, bar_index + 1)
+                line.set_y2(line_midnight, open)
+            
+            // At every new candle during specified time span, update x2 value to move the line to the right with the current bar
+            if midnight_timespan_est
+                line.set_x2(line_midnight, bar_index)
+        
+                // Draw label only for most recent line
+                if i_line_label_toggle
+                    // Get y value (price) of midnight open line
+                    price_midnight_line = line.get_price(line_midnight, bar_index)
+                    label_midnight := label.new(x=bar_index + i_labels_right_mov, y=price_midnight_line, text=str.tostring(price_midnight_line), xloc=xloc.bar_index, color=i_midnight_line_color, textcolor=midnight_text_color, tooltip="Midnight Open Price EST")
+                    label.delete(label_midnight[1])
+
+///////////////////////////////////////////////////////////////////////////////// 8:30 AM EST OPEN
+
+line_style_eith_thirty_open = line_style_function(i_eight_thirty_line_style)
+eight_thirty_text_color = text_color_function(i_eight_thirty_text_color)
+
+// Time period variables
+var int eight_thirty_timespan_est = na
+var bool eight_thirty_window = na
+// 4 minute timeframe is not evenly divisible by 30
+if timeframe.multiplier == 4
+    eight_thirty_window := (hour(time, "America/New_York") == 8) and (minute(time) == 32)
+    eight_thirty_timespan_est := time(timeframe.period, '0832-1659', "America/New_York")
+else
+    eight_thirty_window := (hour(time, "America/New_York") == 8) and (minute(time) == 30)
+    eight_thirty_timespan_est := time(timeframe.period, '0830-1659', "America/New_York")
+
+// Line defaults
+var line line_eight_thirty = na
+var label label_eight_thrity = na
+
+
+// Only display the specified number of days back
+if in_days_back_range
+
+    // Draw line starting at the 8:30 AM EST open candle
+    if i_eight_thirty_toggle and timeframe.isminutes and timeframe.multiplier < 60
+    
+        // If a new day starts, set the high and low to that bar's data. Else
+        // during the day track the highest high and lowest low.
+        if newDayStart
+            // On new day create blank line but with specified style
+            line_eight_thirty := line.new(x1=na, y1=na, x2=na, y2=na, color=i_eight_thirty_line_color, style=line_style_eith_thirty_open, width=i_eight_thirty_line_width)
+        else
+            // At exactly 8:30 AM EST 
+            if eight_thirty_window
+                // Update line with current x's and y's
+                line.set_x1(line_eight_thirty, bar_index)
+                line.set_y1(line_eight_thirty, open)
+                line.set_x2(line_eight_thirty, bar_index + 1)
+                line.set_y2(line_eight_thirty, open)
+            
+            // At every new candle during specified time span, update x2 value to move the line to the right with the current bar
+            if eight_thirty_timespan_est
+                line.set_x2(line_eight_thirty, bar_index)
+        
+                // Draw label only for most recent line
+                if i_line_label_toggle
+                    // Get y value (price) of 8:30 open line
+                    price_eight_thirty_line = line.get_price(line_eight_thirty, bar_index)
+                    label_eight_thrity := label.new(x=bar_index + i_labels_right_mov, y=price_eight_thirty_line, text=str.tostring(price_eight_thirty_line), xloc=xloc.bar_index, color=i_eight_thirty_line_color, textcolor=eight_thirty_text_color, tooltip="8:30 AM EST Open Price")
+                    label.delete(label_eight_thrity[1])
+
+
+
+///////////////////////////////////////////////////////////////////////////////// Future Session Boxes
+
+
+// https://www.tradingview.com/pine-script-docs/en/v5/concepts/Lines_and_boxes.html
+// https://stackoverflow.com/questions/71639162/how-to-draw-a-box-intraday-around-a-defined-session-high-and-low
+// https://stackoverflow.com/a/71710387
+
+
+// Text functions for box variables
+ny_box_text_size = text_size_function(i_ny_box_text_size)
+ny_box_textv_v = text_vertical_alignment_function(i_ny_box_textv_v)
+ny_box_text_h = text_horizontal_alignment_function(i_ny_box_text_h)
+
+
+//------------------------------------
+// ASIAN SESSION
+//------------------------------------
+
+// Time period variables
+asian_session_est = time(timeframe.period, c_asian_session_est, "America/New_York")
+seven_pm_est_window = (hour(time, "America/New_York") == 19) and (minute(time) == 0)
+
+// Text functions for box variables
+asian_box_border_style = line_style_function(i_asian_box_border_style)
+
+// Box defaults
+var box asian_box = na
+var float asian_high = 0.0
+var float asian_low = 0.0
+
+// Only display the specified number of days back
+if in_days_back_range
+
+    // Toggle NY Session box on/off
+    // Only display when timeframe is 30 minutes or less
+    if i_asian_box_toggle and timeframe.isminutes and timeframe.multiplier < 60
+    
+        // If a new day starts, set the high and low to that bar's data. Else
+        // during the day track the highest high and lowest low.
+        if newDayStartAsian
+            
+            // On start of new day create a blank box
+            asian_box := box.new(left=na, top=na, right=na, bottom=na, xloc=xloc.bar_index, text="Asian Session", text_color=i_ny_box_text_color, text_halign=ny_box_text_h, text_valign=ny_box_textv_v, text_size=ny_box_text_size, border_color=i_asian_box_border_color, border_width=i_asian_box_border_width, border_style=asian_box_border_style, bgcolor=i_asian_box_bgcolor)
+        else
+            // At 3 AM EST start calculate highs and lows. Draw first box
+            if seven_pm_est_window
+                asian_high := high
+                asian_low := low
+                
+                box.set_left(asian_box, bar_index)
+                box.set_top(asian_box, asian_high)
+                box.set_right(asian_box, bar_index + 1)
+                box.set_bottom(asian_box, asian_low)
+                
+            // At every new candle during NY Session update highs and lows and redraw the box
+            if asian_session_est
+                asian_high := math.max(asian_high, high)
+                asian_low := math.min(asian_low, low)
+                
+                box.set_right(asian_box, bar_index)
+                box.set_bottom(asian_box, asian_low)
+                box.set_top(asian_box, asian_high)
+
+
+
+//------------------------------------
+// LONDON SESSION
+//------------------------------------
+
+// Time period variables
+london_session_est = time(timeframe.period, c_london_session_est, "America/New_York")
+three_am_est_window = (hour(time, "America/New_York") == 3) and (minute(time) == 0)
+
+// Text functions for box variables
+// x = text_size_function(y)
+// x = text_vertical_alignment_function(y)
+// x = text_horizontal_alignment_function(y)
+
+// Box defaults
+var box london_box = na
+var float london_high = 0.0
+var float london_low = 0.0
+london_box_border_style = line_style_function(i_london_box_border_style)
+
+
+// Only display the specified number of days back
+if in_days_back_range
+
+    // Toggle NY Session box on/off
+    // Only display when timeframe is 30 minutes or less
+    if i_london_box_toggle and timeframe.isminutes and timeframe.multiplier < 60
+    
+        // If a new day starts, set the high and low to that bar's data. Else
+        // during the day track the highest high and lowest low.
+        if newDayStart
+            
+            // On start of new day create a blank box
+            london_box := box.new(left=na, top=na, right=na, bottom=na, xloc=xloc.bar_index, text="London Session", text_color=i_ny_box_text_color, text_halign=ny_box_text_h, text_valign=ny_box_textv_v, text_size=ny_box_text_size, border_color=i_london_box_border_color, border_width=i_london_box_border_width, border_style=london_box_border_style, bgcolor=i_london_box_bgcolor)
+        else
+            // At 3 AM EST start calculate highs and lows. Draw first box
+            if three_am_est_window
+                london_high := high
+                london_low := low
+                
+                box.set_left(london_box, bar_index)
+                box.set_top(london_box, london_high)
+                box.set_right(london_box, bar_index + 1)
+                box.set_bottom(london_box, london_low)
+                
+            // At every new candle during NY Session update highs and lows and redraw the box
+            if london_session_est
+                london_high := math.max(london_high, high)
+                london_low := math.min(london_low, low)
+                
+                box.set_right(london_box, bar_index)
+                box.set_bottom(london_box, london_low)
+                box.set_top(london_box, london_high)
+
+
+//------------------------------------
+// NEW YORK SESSION
+//------------------------------------
+
+// Time period variables
+var int ny_session_est = na
+var bool nine_thirty_est_window = na
+// 4 minute timeframe is not evenly divisible by 30
+if timeframe.multiplier == 4
+    ny_session_est := time(timeframe.period, '0932-1559', "America/New_York")
+    nine_thirty_est_window := (hour(time, "America/New_York") == 9) and (minute(time) == 32)
+else
+    ny_session_est := time(timeframe.period, c_new_york_session_est, "America/New_York")
+    nine_thirty_est_window := (hour(time, "America/New_York") == 9) and (minute(time) == 30)
+
+// Text functions for box variables
+// ny_box_text_size = text_size_function(i_ny_box_text_size)
+// ny_box_textv_v = text_vertical_alignment_function(i_ny_box_textv_v)
+// ny_box_text_h = text_horizontal_alignment_function(i_ny_box_text_h)
+ny_box_border_style = line_style_function(i_ny_box_border_style)
+
+// Box defaults
+var box ny_box = na
+var float ny_high = 0.0
+var float ny_low = 0.0
+
+
+// Only display the specified number of days back
+if in_days_back_range
+
+    // Toggle NY Session box on/off
+    // Only display when timeframe is 30 minutes or less
+    if i_ny_box_toggle and timeframe.isminutes and timeframe.multiplier < 60
+    
+        // If a new day starts, set the high and low to that bar's data. Else
+        // during the day track the highest high and lowest low.
+        if newDayStart
+            
+            // On start of new day create a blank box
+            ny_box := box.new(left=na, top=na, right=na, bottom=na, xloc=xloc.bar_index, text="New York Session", text_color=i_ny_box_text_color, text_halign=ny_box_text_h, text_valign=ny_box_textv_v, text_size=ny_box_text_size, border_color=i_ny_box_border_color, border_width=i_ny_box_border_width, border_style=ny_box_border_style, bgcolor=i_ny_box_bgcolor)
+        else
+            // At 9:30 AM EST start calculate highs and lows. Draw first box
+            if nine_thirty_est_window
+                ny_high := high
+                ny_low := low
+                
+                box.set_left(ny_box, bar_index)
+                box.set_top(ny_box, ny_high)
+                box.set_right(ny_box, bar_index + 1)
+                box.set_bottom(ny_box, ny_low)
+                
+            // At every new candle during NY Session update highs and lows and redraw the box
+            if ny_session_est
+                ny_high := math.max(ny_high, high)
+                ny_low := math.min(ny_low, low)
+                
+                box.set_right(ny_box, bar_index)
+                box.set_bottom(ny_box, ny_low)
+                box.set_top(ny_box, ny_high)
+
+
+///////////////////////////////////////////////////////////////////////////////// 
+

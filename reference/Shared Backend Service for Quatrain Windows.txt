@@ -1,0 +1,144 @@
+
+# Shared Backend Service for Electron Multi-Window Data Sharing
+
+## Architecture Overview
+
+A shared backend service in Electron would consist of:
+
+1. **Main Process Service**: A singleton data manager running in the Electron main process
+2. **Client Adapters**: Interface code in each renderer process (window)
+3. **Communication Protocol**: Structured API for windows to request and receive data
+
+## Implementation Technologies
+
+### Core Technologies
+- **Electron IPC**: For communication between windows and the service
+- **RxJS**: For reactive data streams and subscriptions
+- **LevelDB/SQLite**: For persistent storage (if needed)
+- **Node.js workers**: For computationally intensive operations
+
+### Data Structure
+- In-memory data store with indexed access
+- Observable streams for real-time updates
+- Efficient delta processing to minimize IPC payload size
+
+## How It Works
+
+### Service Initialization
+```javascript
+// In main.js (main process)
+const DataService = require('./services/data-service');
+const dataService = new DataService();
+
+// Register IPC handlers
+ipcMain.handle('data:subscribe', handleSubscription);
+ipcMain.handle('data:request', handleDataRequest);
+```
+
+### Client Interface
+```javascript
+// In a renderer window
+import { DataClient } from '../services/data-client';
+
+// Create client connection to data service
+const dataClient = new DataClient();
+
+// Subscribe to data updates
+dataClient.subscribe('candles:1m', (updatedData) => {
+  // Process new data
+});
+
+// Request specific data
+dataClient.request('candles:1m:range', { start, end })
+  .then(data => {
+    // Process retrieved data
+});
+```
+
+### Communication Patterns
+
+1. **Subscription-Based**: Windows subscribe to specific data streams
+   ```
+   Window → Main Process: "Subscribe to instrument ESM5, 1m candles"
+   Main Process → Window: "New candle: {...}"  (pushed when available)
+   ```
+
+2. **Request-Response**: Windows request specific data on demand
+   ```
+   Window → Main Process: "Get last 100 candles for ESM5, 1m"
+   Main Process → Window: [array of candles]
+   ```
+
+3. **Command-Execution**: Windows trigger operations on shared data
+   ```
+   Window → Main Process: "Update annotation at timestamp X"
+   Main Process → All Windows: "Annotation updated: {...}"
+   ```
+
+## Optimizations
+
+1. **Data Segmentation**: Divide data into logical segments (by instrument, timeframe)
+2. **Chunked Transfers**: Split large datasets into manageable chunks
+3. **Delta Updates**: Send only what changed, not entire datasets
+4. **Background Processing**: Offload heavy computations to separate threads
+5. **Compression**: Compress large payloads before IPC transfer
+
+## Example Implementation
+
+```javascript
+// data-service.js (main process)
+class DataService {
+  constructor() {
+    this.candleStore = {}; // In-memory data
+    this.subscribers = new Map();
+  }
+
+  // Add new data and notify subscribers
+  addCandle(instrument, timeframe, candle) {
+    // Store data
+    if (!this.candleStore[instrument]) this.candleStore[instrument] = {};
+    if (!this.candleStore[instrument][timeframe]) this.candleStore[instrument][timeframe] = [];
+    
+    this.candleStore[instrument][timeframe].push(candle);
+    
+    // Notify subscribers
+    const key = `candles:${instrument}:${timeframe}`;
+    if (this.subscribers.has(key)) {
+      this.subscribers.get(key).forEach(subscriber => {
+        subscriber.window.webContents.send('data:update', {
+          channel: key,
+          data: candle
+        });
+      });
+    }
+  }
+  
+  // Handle subscription requests
+  subscribe(windowId, channel, window) {
+    if (!this.subscribers.has(channel)) {
+      this.subscribers.set(channel, new Map());
+    }
+    this.subscribers.get(channel).set(windowId, { window });
+    return true;
+  }
+  
+  // Handle data requests
+  requestData(channel, params) {
+    const [type, instrument, timeframe] = channel.split(':');
+    if (type === 'candles') {
+      return this.getCandlesForInstrument(instrument, timeframe, params);
+    }
+    return null;
+  }
+}
+```
+
+## Advantages
+
+1. **Centralized State**: Single source of truth for all data
+2. **Memory Efficiency**: Data stored only once in the main process
+3. **Bandwidth Control**: Windows only receive the data they need
+4. **Simplified Window Code**: Renderer processes have a clean API to access data
+5. **Scalable**: Can handle many windows efficiently
+
+This architecture would scale extremely well for your use case of sharing candle data among multiple windows while maintaining performance and memory efficiency.

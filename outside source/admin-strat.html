@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Strategy Admin Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        section {
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+
+        h2 {
+            margin-top: 0;
+        }
+
+        label {
+            display: block;
+            margin: 5px 0;
+        }
+
+        input {
+            width: 300px;
+            padding: 5px;
+        }
+
+        button {
+            padding: 5px 10px;
+            margin-right: 10px;
+        }
+
+        .log-window {
+            height: 300px; /* Shows ~50 lines; adjust as needed */
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px dashed #aaa;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+
+        .subscription {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Strategy Admin Client</h1>
+
+    <!-- New "Client Settings" Section -->
+    <section>
+        <h2>Client Settings</h2>
+        <label for="clientIdInput">Client ID:</label>
+        <input type="text" id="clientIdInput" placeholder="Enter Client ID">
+        <button id="setClientIdButton">Set Client ID</button>
+    </section>
+
+
+    <!-- "Manage Annotations" Section -->
+    <section>
+        <h2>Manage Annotations</h2>
+        <label for="anno-client-id">Client ID:</label>
+        <input type="text" id="anno-client-id" placeholder="e.g., quatrain-dev">
+        <label for="anno-unique-id">Unique ID:</label>
+        <input type="text" id="anno-unique-id" placeholder="e.g., m9em3r8njzdlb">
+        <button id="delete-anno-btn">Delete Annotations</button>
+    </section>
+
+    <!-- "Retrieve Annotations" Section -->
+    <section>
+        <h2>Retrieve Annotations</h2>
+        <label for="get-anno-client-id">Client ID:</label>
+        <input type="text" id="get-anno-client-id" placeholder="e.g., quatrain-dev">
+        <label for="get-anno-instrument">Instrument:</label>
+        <input type="text" id="get-anno-instrument" placeholder="e.g., ESM5">
+        <label for="get-anno-timeframe">Timeframe:</label>
+        <input type="text" id="get-anno-timeframe" placeholder="e.g., 1h (or 'all')">
+        <button id="get-anno-btn">Get Annotations</button>
+    </section>
+
+    <!-- "Strategy Registration" Section -->
+    <section>
+        <h2>Strategy Registration</h2>
+        <label for="strat-client-id">Client ID:</label>
+        <input type="text" id="strat-client-id" placeholder="Strategy Client ID">
+        <label for="strat-name">Strategy Name:</label>
+        <input type="text" id="strat-name" placeholder="Strategy Name">
+        <label for="strat-description">Description:</label>
+        <input type="text" id="strat-description" placeholder="Strategy Description">
+        <label for="strat-parameters">Parameters (JSON):</label>
+        <input type="text" id="strat-parameters" placeholder='{"param1": "value1", "param2": "value2"}'>
+        <label for="strat-reinit">
+            <input type="checkbox" id="strat-reinit"> Re-Init (clears existing annotations)
+        </label>
+        <div style="margin-top: 10px;">
+            <button id="register-strat-btn">Register Strat</button>
+            <button id="unregister-strat-btn">Unregister Strat</button>
+        </div>
+    </section>
+
+    <!-- "Strategy Retrieval" Section -->
+    <section>
+        <h2>Strategy Retrieval</h2>
+        <label for="get-strat-client-id">Client ID:</label>
+        <input type="text" id="get-strat-client-id" placeholder="Client ID (optional)">
+        <label for="get-strat-name">Strategy Name:</label>
+        <input type="text" id="get-strat-name" placeholder="Strategy Name (optional)">
+        <button id="get-strat-btn">Get Strategies</button>
+    </section>
+
+    <h2>Messages and Control Info</h2>
+    <div id="response" class="log-window"></div>
+
+    <h2>Data Feed</h2>
+    <div id="dataFeed" class="log-window"></div>
+
+    <script>
+        const ws = new WebSocket('ws://localhost:8080');
+        const responseDiv = document.getElementById('response');
+        const dataFeedDiv = document.getElementById('dataFeed');
+        const maxLines = 50000; // Limit for Data Feed to conserve memory
+        let dataFeedLines = [];
+
+        ws.onopen = () => {
+            console.log('Connected to WebSocket server');
+            appendToLog(responseDiv, 'Connected to WebSocket server');
+        };
+
+        ws.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            if (message.mtyp === 'data') {
+                appendToDataFeed(JSON.stringify(message));
+            } else {
+                appendToLog(responseDiv, JSON.stringify(message, null, 2));
+            }
+            if (message.action === 'settings_response' && message.value) {
+                document.getElementById('feed-type').value = message.value['feed-type'] || '';
+                document.getElementById('api_key').value = message.value['api_key'] || '';
+                document.getElementById('dataset').value = message.value['dataset'] || '';
+                document.getElementById('live_host').value = message.value['live_host'] || '';
+                document.getElementById('live_port').value = message.value['live_port'] || '';
+                document.getElementById('hist_host').value = message.value['hist_host'] || '';
+            }
+        };
+
+        ws.onerror = (err) => {
+            console.error('WebSocket error:', err);
+            appendToLog(responseDiv, 'WebSocket error: ' + err.message);
+        };
+
+        ws.onclose = () => {
+            console.log('WebSocket connection closed');
+            appendToLog(responseDiv, 'WebSocket connection closed');
+        };
+
+        function appendToLog(div, message) {
+            div.textContent += message + '\n';
+            div.scrollTop = div.scrollHeight; // Auto-scroll to bottom
+        }
+
+        function appendToDataFeed(message) {
+            if (dataFeedLines.length >= maxLines) {
+                dataFeedLines.shift(); // Remove oldest line
+            }
+            dataFeedLines.push(message);
+            dataFeedDiv.textContent = dataFeedLines.join('\n');
+            dataFeedDiv.scrollTop = dataFeedDiv.scrollHeight; // Auto-scroll to bottom
+        }
+
+
+
+        // Set Client ID Functionality
+        const clientIdInput = document.getElementById('clientIdInput');
+        const setClientIdButton = document.getElementById('setClientIdButton');
+
+        setClientIdButton.addEventListener('click', () => {
+            const clientId = clientIdInput.value.trim();
+            if (!clientId) {
+                alert('Please enter a valid Client ID');
+                return;
+            }
+            const request = {
+                action: 'set_client_id',
+                clientid: clientId
+            };
+            ws.send(JSON.stringify(request));
+            clientIdInput.value = ''; // Clear the input after sending
+            console.log(`Sent set_client_id request with ID: ${clientId}`);
+        });
+
+        // Manage Annotations Functionality
+        const annoClientIdInput = document.getElementById('anno-client-id');
+        const annoUniqueIdInput = document.getElementById('anno-unique-id');
+        const deleteAnnoBtn = document.getElementById('delete-anno-btn');
+
+        deleteAnnoBtn.addEventListener('click', () => {
+            const clientId = annoClientIdInput.value.trim() || 'all';
+            const uniqueId = annoUniqueIdInput.value.trim() || 'all';
+            
+            const request = {
+                action: 'delete_anno',
+                clientid: clientId,
+                unique: uniqueId
+            };
+            
+            ws.send(JSON.stringify(request));
+            console.log(`Sent delete_anno request for clientid: ${clientId}, unique: ${uniqueId}`);
+        });
+
+        // Retrieve Annotations Functionality
+        const getAnnoClientIdInput = document.getElementById('get-anno-client-id');
+        const getAnnoInstrumentInput = document.getElementById('get-anno-instrument');
+        const getAnnoTimeframeInput = document.getElementById('get-anno-timeframe');
+        const getAnnoBtn = document.getElementById('get-anno-btn');
+
+        getAnnoBtn.addEventListener('click', () => {
+            const clientId = getAnnoClientIdInput.value.trim() || 'all';
+            const instrument = getAnnoInstrumentInput.value.trim() || 'all';
+            const timeframe = getAnnoTimeframeInput.value.trim() || 'all';
+            
+            const message = {
+                action: 'get_anno',
+                clienttype: 'strategy'
+            };
+            
+            // Only include fields with values
+            if (clientId !== 'all') message.clientid = clientId;
+            if (instrument !== 'all') message.instrument = instrument;
+            if (timeframe !== 'all') message.timeframe = timeframe;
+            
+            ws.send(JSON.stringify(message));
+            console.log(`Sent get_anno request with: ${JSON.stringify(message)}`);
+        });
+
+        // Strategy Registration Functionality
+        const stratClientIdInput = document.getElementById('strat-client-id');
+        const stratNameInput = document.getElementById('strat-name');
+        const stratDescriptionInput = document.getElementById('strat-description');
+        const stratParametersInput = document.getElementById('strat-parameters');
+        const stratReinitCheckbox = document.getElementById('strat-reinit');
+        const registerStratBtn = document.getElementById('register-strat-btn');
+        const unregisterStratBtn = document.getElementById('unregister-strat-btn');
+
+        registerStratBtn.addEventListener('click', () => {
+            const clientId = stratClientIdInput.value.trim();
+            if (!clientId) {
+                alert('Please enter a valid Client ID');
+                return;
+            }
+
+            const request = {
+                action: 'register_strat',
+                clientid: clientId,
+                reinit: stratReinitCheckbox.checked
+            };
+
+            // Add optional fields if they have values
+            const name = stratNameInput.value.trim();
+            if (name) request.name = name;
+
+            const description = stratDescriptionInput.value.trim();
+            if (description) request.description = description;
+
+            // Parse parameters JSON if provided
+            const parametersText = stratParametersInput.value.trim();
+            if (parametersText) {
+                try {
+                    request.parameters = JSON.parse(parametersText);
+                } catch (e) {
+                    alert('Invalid JSON in Parameters field');
+                    return;
+                }
+            }
+
+            ws.send(JSON.stringify(request));
+            console.log(`Sent register_strat request: ${JSON.stringify(request)}`);
+        });
+
+        unregisterStratBtn.addEventListener('click', () => {
+            const clientId = stratClientIdInput.value.trim();
+            if (!clientId) {
+                alert('Please enter a valid Client ID');
+                return;
+            }
+
+            const request = {
+                action: 'unregister_strat',
+                clientid: clientId
+            };
+
+            ws.send(JSON.stringify(request));
+            console.log(`Sent unregister_strat request for clientId: ${clientId}`);
+        });
+
+        // Strategy Retrieval Functionality
+        const getStratClientIdInput = document.getElementById('get-strat-client-id');
+        const getStratNameInput = document.getElementById('get-strat-name');
+        const getStratBtn = document.getElementById('get-strat-btn');
+
+        getStratBtn.addEventListener('click', () => {
+            const clientId = getStratClientIdInput.value.trim();
+            const name = getStratNameInput.value.trim();
+            
+            const request = {
+                action: 'get_strat'
+            };
+            
+            // Only include fields if they have values
+            if (clientId) request.clientid = clientId;
+            if (name) request.name = name;
+            
+            ws.send(JSON.stringify(request));
+            console.log(`Sent get_strat request: ${JSON.stringify(request)}`);
+        });
+    </script>
+</body>
+</html>
