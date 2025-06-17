@@ -558,76 +558,481 @@ The system provides detailed loading information:
 
 ## Performance Guidelines
 
-### Data Processing Optimization
+⚠️ **Critical**: User Studies run synchronously on the main JavaScript thread and can impact Quatrain's responsiveness. Following these guidelines is essential for maintaining good performance, especially when multiple studies are active.
 
-1. **Cache Calculations**: Avoid recalculating unchanged data
-2. **Batch Updates**: Group annotation changes to minimize redraws
-3. **Lazy Loading**: Only process visible timeframes when possible
+### 1. **Implement Intelligent Caching**
 
+Always cache calculation results to avoid unnecessary recomputation:
+
+#### Basic Data Hash Caching
 ```javascript
-// Good: Cache expensive calculations
-calculateIndicators() {
-    const oneMinData = this.chartData['1m'] || [];
+class MyStudy {
+    constructor() {
+        this.calculationCache = new Map();
+        this.lastDataHash = null;
+    }
     
-    // Check if data actually changed
-    const dataHash = this.generateDataHash(oneMinData);
-    if (this.lastDataHash === dataHash) return;
+    updateData(chartData, sessions) {
+        // Generate hash to detect actual data changes
+        const dataHash = this.generateDataHash(chartData);
+        
+        if (this.lastDataHash === dataHash) {
+            console.log('Data unchanged, skipping calculation');
+            return; // Skip expensive recalculation
+        }
+        
+        this.lastDataHash = dataHash;
+        this.recalculate(chartData, sessions);
+    }
     
-    this.lastDataHash = dataHash;
-    
-    // Perform expensive calculations only when needed
-    this.processedData = this.expensiveCalculation(oneMinData);
-}
-
-generateDataHash(data) {
-    if (data.length === 0) return 'empty';
-    const last = data[data.length - 1];
-    return `${data.length}_${last.timestamp}_${last.close}`;
+    generateDataHash(chartData) {
+        // Simple hash based on data length and last timestamp
+        const relevantData = chartData['1m'] || [];
+        if (relevantData.length === 0) return 'empty';
+        
+        const lastCandle = relevantData[relevantData.length - 1];
+        return `${relevantData.length}-${lastCandle.timestamp}-${lastCandle.close}`;
+    }
 }
 ```
 
-### Memory Management
-
-1. **WebGL Cleanup**: Always call `.delete()` on removed annotations
-2. **Limit Annotations**: Remove old annotations when adding new ones
-3. **Data Pruning**: Don't hold onto excessive historical data
-
+#### Per-Timeframe Caching
 ```javascript
-// Good: Proper WebGL cleanup
-removeAnnotation(annotation) {
+updateData(chartData, sessions) {
     this.timeframes.forEach(timeframe => {
-        const surface = this.sciChartSurfaceRefs[timeframe];
-        if (surface && surface.annotations.contains(annotation)) {
-            surface.annotations.remove(annotation);
-            
-            // Critical: Free WebGL memory
-            if (annotation.delete) {
-                annotation.delete();
-            }
+        const data = chartData[timeframe] || [];
+        const cacheKey = `${timeframe}-${data.length}`;
+        
+        // Only recalculate if this timeframe's data changed
+        if (this.calculationCache.has(cacheKey)) {
+            return; // Use cached result
         }
+        
+        const result = this.expensiveCalculation(data);
+        this.calculationCache.set(cacheKey, result);
     });
 }
 ```
 
-### Annotation Limits
+### 2. **Optimize Algorithm Complexity**
 
-- **Recommended**: Keep total annotations under 100 per timeframe
-- **Maximum**: Avoid exceeding 500 annotations per timeframe
-- **Strategy**: Implement rolling window for historical annotations
+#### Use Efficient Data Structures
+```javascript
+// ❌ BAD: O(n²) complexity
+calculateMovingAverage(data, period) {
+    return data.map((_, index) => {
+        if (index < period - 1) return null;
+        
+        let sum = 0;
+        for (let i = index - period + 1; i <= index; i++) {
+            sum += data[i].close; // Recalculating sum each time
+        }
+        return sum / period;
+    });
+}
+
+// ✅ GOOD: O(n) complexity with sliding window
+calculateMovingAverage(data, period) {
+    const result = [];
+    let sum = 0;
+    
+    // Initialize first window
+    for (let i = 0; i < Math.min(period, data.length); i++) {
+        sum += data[i].close;
+    }
+    
+    for (let i = period - 1; i < data.length; i++) {
+        if (i >= period) {
+            // Slide window: remove old, add new
+            sum = sum - data[i - period].close + data[i].close;
+        }
+        result.push(sum / period);
+    }
+    
+    return result;
+}
+```
+
+#### Limit Lookback Periods
+```javascript
+getUIConfig() {
+    return {
+        settingsSchema: [{
+            key: 'lookbackPeriod',
+            type: 'number',
+            min: 1,
+            max: 200, // ✅ Set reasonable maximums
+            default: 20,
+            tooltip: 'Higher values increase calculation time'
+        }]
+    };
+}
+
+calculateIndicator(data) {
+    // ✅ Limit actual processing regardless of user setting
+    const maxSafetyLimit = 500;
+    const effectiveLookback = Math.min(this.settings.lookbackPeriod, maxSafetyLimit);
+    
+    const startIndex = Math.max(0, data.length - effectiveLookback);
+    return this.processDataSlice(data.slice(startIndex));
+}
+```
+
+### 3. **Implement Selective Timeframe Processing**
+
+Only process timeframes relevant to your study:
 
 ```javascript
-// Good: Implement annotation limits
-addAnnotation(annotation) {
-    // Add new annotation
-    this.annotations.push(annotation);
+class MyStudy {
+    getValidTimeframes() {
+        // ✅ Only process timeframes that make sense for your study
+        const timeframeOrder = ['1m', '5m', '15m', '30m', '1h', '4h', '1d'];
+        const maxTimeframe = this.settings.maxTimeframe || '1h';
+        const maxIndex = timeframeOrder.indexOf(maxTimeframe);
+        
+        return this.timeframes.filter(tf => {
+            const index = timeframeOrder.indexOf(tf);
+            return index !== -1 && index <= maxIndex;
+        });
+    }
     
-    // Enforce limits (keep only last 50)
-    if (this.annotations.length > 50) {
-        const oldAnnotation = this.annotations.shift();
-        this.removeAnnotation(oldAnnotation);
+    updateData(chartData, sessions) {
+        // ✅ Only process relevant timeframes
+        const validTimeframes = this.getValidTimeframes();
+        
+        validTimeframes.forEach(timeframe => {
+            this.processTimeframe(timeframe, chartData[timeframe]);
+        });
     }
 }
 ```
+
+### 4. **Optimize Annotation Management**
+
+#### Batch Annotation Operations
+```javascript
+// ❌ BAD: Multiple individual operations
+removeOldAnnotations() {
+    this.annotations.forEach(annotation => {
+        surface.annotations.remove(annotation); // Multiple WebGL calls
+    });
+}
+
+// ✅ GOOD: Batch operations
+removeOldAnnotations() {
+    const surface = this.sciChartSurfaceRefs[timeframe];
+    const toRemove = [];
+    
+    // Collect first
+    surface.annotations.asArray().forEach(annotation => {
+        if (annotation.id && annotation.id.startsWith(this.annotationPrefix)) {
+            toRemove.push(annotation);
+        }
+    });
+    
+    // Batch remove
+    toRemove.forEach(annotation => {
+        surface.annotations.remove(annotation);
+        if (annotation.delete) annotation.delete(); // Free WebGL resources
+    });
+    
+    // Single invalidation
+    surface.invalidateElement();
+}
+```
+
+#### Limit Annotation Count
+```javascript
+class MyStudy {
+    constructor() {
+        this.maxAnnotationsPerTimeframe = 50; // ✅ Set limits
+        this.annotations = {};
+    }
+    
+    addAnnotation(timeframe, annotation) {
+        if (!this.annotations[timeframe]) {
+            this.annotations[timeframe] = [];
+        }
+        
+        // ✅ Remove oldest if at limit
+        if (this.annotations[timeframe].length >= this.maxAnnotationsPerTimeframe) {
+            const oldest = this.annotations[timeframe].shift();
+            this.removeAnnotation(timeframe, oldest);
+        }
+        
+        this.annotations[timeframe].push(annotation);
+        surface.annotations.add(annotation);
+    }
+}
+```
+
+### 5. **Implement Incremental Updates**
+
+Process only new data when possible:
+
+```javascript
+class MyStudy {
+    constructor() {
+        this.lastProcessedIndex = {};
+    }
+    
+    updateData(chartData, sessions) {
+        this.timeframes.forEach(timeframe => {
+            const data = chartData[timeframe] || [];
+            const lastIndex = this.lastProcessedIndex[timeframe] || 0;
+            
+            if (data.length <= lastIndex) return; // No new data
+            
+            // ✅ Only process new candles
+            const newData = data.slice(lastIndex);
+            this.processIncrementalUpdate(timeframe, newData, data);
+            
+            this.lastProcessedIndex[timeframe] = data.length;
+        });
+    }
+    
+    processIncrementalUpdate(timeframe, newCandles, allData) {
+        // Process only the new candles and update indicators incrementally
+        newCandles.forEach(candle => {
+            this.updateIndicatorWithNewCandle(timeframe, candle);
+        });
+    }
+}
+```
+
+### 6. **Memory Management Best Practices**
+
+#### Proper Resource Cleanup
+```javascript
+destroy() {
+    // ✅ Comprehensive cleanup
+    console.log(`${this.getUIConfig().displayName} destroying...`);
+    
+    // Remove all annotations with proper WebGL cleanup
+    this.removeAllAnnotations();
+    
+    // Clear caches
+    this.calculationCache?.clear();
+    this.annotations = {};
+    this.lastProcessedIndex = {};
+    
+    // Null out references
+    this.chartData = null;
+    this.sessions = null;
+    this.sciChartSurfaceRefs = null;
+    
+    // Clear any intervals/timeouts
+    if (this.updateTimer) {
+        clearInterval(this.updateTimer);
+        this.updateTimer = null;
+    }
+}
+```
+
+#### Avoid Memory Leaks
+```javascript
+// ❌ BAD: Holding references to large objects
+class MyStudy {
+    updateData(chartData, sessions) {
+        this.allHistoricalData = chartData; // Keeps growing!
+        this.processData();
+    }
+}
+
+// ✅ GOOD: Process and release
+class MyStudy {
+    updateData(chartData, sessions) {
+        const processedResults = this.processData(chartData);
+        this.updateAnnotations(processedResults);
+        // Don't store the full chartData reference
+    }
+}
+```
+
+### 7. **Performance-Aware Settings Design**
+
+Provide performance guidance to users:
+
+```javascript
+getUIConfig() {
+    return {
+        settingsSchema: [{
+            type: 'section',
+            title: 'Performance Settings',
+            description: 'Higher values may impact chart performance',
+            controls: [{
+                key: 'complexity',
+                type: 'select',
+                label: 'Calculation Complexity',
+                options: [
+                    { value: 'low', label: 'Low (Fast)' },
+                    { value: 'medium', label: 'Medium (Balanced)' },
+                    { value: 'high', label: 'High (Slow but Accurate)' }
+                ],
+                default: 'medium',
+                tooltip: 'Low: 20 periods, Medium: 50 periods, High: 100 periods'
+            }]
+        }]
+    };
+}
+
+getEffectiveLookback() {
+    const complexityMap = {
+        'low': 20,
+        'medium': 50,
+        'high': 100
+    };
+    return complexityMap[this.settings.complexity] || 50;
+}
+```
+
+### 8. **Early Exit Strategies**
+
+Skip unnecessary processing:
+
+```javascript
+updateData(chartData, sessions) {
+    // ✅ Early exits
+    if (!this.settings.enabled) return;
+    if (!this.sciChartSurfaceRefs) return;
+    if (!chartData || Object.keys(chartData).length === 0) return;
+    
+    // Check if we have minimum required data
+    const primaryData = chartData['1m'] || [];
+    if (primaryData.length < this.getMinimumDataRequired()) {
+        console.log(`${this.getUIConfig().displayName}: Insufficient data`);
+        return;
+    }
+    
+    this.performCalculations(chartData, sessions);
+}
+
+getMinimumDataRequired() {
+    return Math.max(this.settings.lookbackPeriod || 20, 10);
+}
+```
+
+### 9. **Computational Complexity Guidelines**
+
+#### Target Complexities
+```javascript
+// ✅ Simple indicators (moving averages, etc.): O(n) where n ≤ 200
+calculateSimpleMA(data, period) {
+    // Linear time, single pass
+}
+
+// ✅ Complex indicators (bands, oscillators): O(n log n) maximum
+calculateBollingerBands(data, period) {
+    // May need sorting/statistical operations
+}
+
+// ❌ Avoid: O(n²) or higher complexity
+// Don't do nested loops over large datasets
+```
+
+#### Performance Budgets
+```javascript
+// ✅ Target processing times per study:
+// - Simple studies: < 5ms per update
+// - Complex studies: < 20ms per update
+// - Maximum acceptable: < 50ms per update
+
+updateData(chartData, sessions) {
+    const startTime = performance.now();
+    
+    try {
+        this.performCalculations(chartData, sessions);
+    } finally {
+        const duration = performance.now() - startTime;
+        
+        if (duration > 10) {
+            console.warn(`${this.getUIConfig().displayName}: Slow update ${duration.toFixed(2)}ms`);
+        }
+        
+        if (duration > 50) {
+            console.error(`${this.getUIConfig().displayName}: VERY SLOW update ${duration.toFixed(2)}ms`);
+        }
+    }
+}
+```
+
+### 10. **Performance Testing and Monitoring**
+
+#### Built-in Performance Monitoring
+```javascript
+class MyStudy {
+    constructor() {
+        this.performanceStats = {
+            totalUpdates: 0,
+            totalTime: 0,
+            maxTime: 0,
+            recentTimes: []
+        };
+    }
+    
+    updateData(chartData, sessions) {
+        const startTime = performance.now();
+        
+        try {
+            this.performCalculations(chartData, sessions);
+        } finally {
+            const duration = performance.now() - startTime;
+            this.recordPerformance(duration);
+        }
+    }
+    
+    recordPerformance(duration) {
+        this.performanceStats.totalUpdates++;
+        this.performanceStats.totalTime += duration;
+        this.performanceStats.maxTime = Math.max(this.performanceStats.maxTime, duration);
+        
+        // Keep last 10 measurements
+        this.performanceStats.recentTimes.push(duration);
+        if (this.performanceStats.recentTimes.length > 10) {
+            this.performanceStats.recentTimes.shift();
+        }
+        
+        // Log performance warnings
+        if (duration > 20) {
+            console.warn(`${this.getUIConfig().displayName}: Slow update ${duration.toFixed(2)}ms`);
+        }
+    }
+    
+    getPerformanceReport() {
+        const stats = this.performanceStats;
+        const avgTime = stats.totalTime / stats.totalUpdates;
+        const recentAvg = stats.recentTimes.reduce((a, b) => a + b, 0) / stats.recentTimes.length;
+        
+        return {
+            averageTime: avgTime.toFixed(2),
+            maxTime: stats.maxTime.toFixed(2),
+            recentAverage: recentAvg.toFixed(2),
+            totalUpdates: stats.totalUpdates
+        };
+    }
+}
+```
+
+### Performance Summary - Critical Guidelines
+
+1. **Always implement caching** for expensive calculations
+2. **Limit algorithm complexity** to O(n) or O(n log n) maximum  
+3. **Process only relevant timeframes** for your study
+4. **Use incremental updates** when possible
+5. **Batch annotation operations** to reduce WebGL overhead
+6. **Set reasonable limits** on user-configurable parameters
+7. **Clean up resources properly** in destroy() method
+8. **Provide early exits** for unnecessary processing
+9. **Monitor performance** during development
+10. **Design settings with performance in mind**
+
+**Performance Targets:**
+- **Simple studies**: < 5ms per update
+- **Complex studies**: < 20ms per update  
+- **Maximum acceptable**: < 50ms per update
+- **Annotation limit**: < 100 per timeframe
+
+Following these guidelines ensures your studies scale well and don't impact Quatrain's responsiveness, even when multiple studies are running simultaneously.
 
 ## Quatrain Integration Patterns
 
