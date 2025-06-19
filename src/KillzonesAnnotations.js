@@ -5,28 +5,28 @@ class KillzonesAnnotations {
         this.settings = {
             daysBack: 2,
             killzone1: {
-                enabled: true,
+                enabled: false,
                 startTime: '08:30',
                 endTime: '09:31',
                 color: '#0000CC',
                 opacity: 0.10
             },
             killzone2: {
-                enabled: true,
+                enabled: false,
                 startTime: '09:30',
                 endTime: '11:31',
                 color: '#DDDDDD',
                 opacity: 0.15
             },
             killzone3: {
-                enabled: true,
+                enabled: false,
                 startTime: '13:30',
                 endTime: '15:01',
                 color: '#DDDD00',
                 opacity: 0.15
             },
             killzone4: {
-                enabled: true,
+                enabled: false,
                 startTime: '15:00',
                 endTime: '16:01',
                 color: '#00DDDD',

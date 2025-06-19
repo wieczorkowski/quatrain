@@ -20,31 +20,31 @@ class IctPriceLinesAnnotations {
                 endTime: '07:00'
             },
             ny0000: {
-                enabled: true,
+                enabled: false,
                 color: '#d40c0c',  // Red
                 opacity: 1.0,
                 lineType: 'dashed'
             },
             ny0830: {
-                enabled: true,
+                enabled: false,
                 color: '#fbc02d',  // Yellow
                 opacity: 1.0,
                 lineType: 'solid'
             },
             ny0930: {
-                enabled: true,
+                enabled: false,
                 color: '#00cd88',  // Green
                 opacity: 1.0,
                 lineType: 'solid'
             },
             londonOpen: {
-                enabled: true,
+                enabled: false,
                 color: '#008fff',  // Blue
                 opacity: 1.0,
                 lineType: 'solid'
             },
             londonHighLow: {
-                enabled: true,
+                enabled: false,
                 color: '#a2a2a2',  // Medium Gray
                 opacity: 1.0,
                 lineType: 'solid'

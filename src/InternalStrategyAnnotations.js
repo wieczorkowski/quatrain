@@ -29,11 +29,11 @@ class InternalStrategyAnnotations {
         
         this.settings = {
             previousDayHighLow: {
-                enabled: true,
+                enabled: false,
                 color: '#B22222'
             },
             preMarketHighLow: {
-                enabled: true,
+                enabled: false,
                 color: '#228B22',
                 beginTime: '18:00',
                 endTime: '09:30'

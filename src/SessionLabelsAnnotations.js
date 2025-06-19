@@ -36,7 +36,7 @@ class SessionLabelsAnnotations {
         
         this.settings = {
             asianSession: {
-                enabled: true,
+                enabled: false,
                 boxColor: '#FF0000',
                 boxOpacity: 0.1,
                 borderColor: '#000000',
@@ -45,7 +45,7 @@ class SessionLabelsAnnotations {
                 borderStyle: 'solid'
             },
             londonSession: {
-                enabled: true,
+                enabled: false,
                 boxColor: '#0000FF',
                 boxOpacity: 0.1,
                 borderColor: '#000000',
@@ -54,7 +54,7 @@ class SessionLabelsAnnotations {
                 borderStyle: 'solid'
             },
             nySession: {
-                enabled: true,
+                enabled: false,
                 boxColor: '#00FF00',
                 boxOpacity: 0.1,
                 borderColor: '#000000',
