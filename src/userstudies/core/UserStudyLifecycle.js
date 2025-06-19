@@ -163,9 +163,15 @@ class UserStudyLifecycle {
 
             const oldSettings = study.getSettings();
             const wasEnabled = oldSettings.enabled;
-            const willBeEnabled = newSettings.enabled;
-
+            
+            // Extract enabled flag from nested settings structure
+            let willBeEnabled = newSettings.enabled; // Try flat first
+            if (willBeEnabled === undefined && newSettings.main) {
+                willBeEnabled = newSettings.main.enabled; // Try nested
+            }
+            
             console.log(`🔧 Updating settings for study ${studyId}:`, newSettings);
+            console.log(`🔍 Enable state: was=${wasEnabled}, will=${willBeEnabled}`);
 
             // Handle enable/disable state changes
             if (!wasEnabled && willBeEnabled) {
@@ -205,14 +211,31 @@ class UserStudyLifecycle {
         console.log('🔄 Reloading all user studies...');
         
         try {
+            // Save current chart context before destroying
+            const savedContext = {
+                sciChartSurfaceRefs: this.sciChartSurfaceRefs,
+                timeframes: this.timeframes,
+                currentChartData: this.currentChartData,
+                currentSessions: this.currentSessions
+            };
+
             // Destroy existing studies
             this.destroy();
 
             // Reload studies from disk
             await UserStudyLoader.reloadUserStudies();
 
-            // Re-initialize if we have chart references
-            if (this.sciChartSurfaceRefs) {
+            // Re-initialize if we had chart references
+            if (savedContext.sciChartSurfaceRefs) {
+                console.log('🔄 Re-initializing studies with saved chart context...');
+                
+                // Restore context
+                this.sciChartSurfaceRefs = savedContext.sciChartSurfaceRefs;
+                this.timeframes = savedContext.timeframes;
+                this.currentChartData = savedContext.currentChartData;
+                this.currentSessions = savedContext.currentSessions;
+                
+                // Initialize all studies
                 UserStudyRegistry.initializeStudies(
                     this.sciChartSurfaceRefs,
                     this.timeframes,
@@ -220,6 +243,10 @@ class UserStudyLifecycle {
                     this.currentSessions
                 );
                 this.initialized = true;
+                
+                console.log('✅ Studies re-initialized with chart context');
+            } else {
+                console.warn('⚠️ No chart context available for re-initialization');
             }
 
             console.log('✅ User studies reloaded successfully');

@@ -116,7 +116,7 @@ const UserStudiesPanel = ({ onClose, sciChartSurface, candles, sessions = [] }) 
 
     const reloadUserStudies = async () => {
         console.log('Reloading user studies...');
-        await UserStudyLoader.reloadUserStudies();
+        await UserStudyLifecycle.reloadStudies();
         refreshStudies();
     };
 
@@ -156,8 +156,13 @@ const UserStudiesPanel = ({ onClose, sciChartSurface, candles, sessions = [] }) 
                 const settings = JSON.parse(e.target.result);
                 
                 Object.entries(settings).forEach(([studyId, studySettings]) => {
-                    if (UserStudyRegistry.getStudy(studyId)) {
-                        UserStudyRegistry.updateStudySettings(studyId, studySettings);
+                    const study = UserStudyRegistry.getStudy(studyId);
+                    if (study) {
+                        // Transform flat settings back to nested structure before applying
+                        const nestedSettings = transformFlatToNestedSettings(studyId, studySettings);
+                        console.log(`🔄 [IMPORT] Transforming settings for ${studyId}:`, { flat: studySettings, nested: nestedSettings });
+                        
+                        UserStudyLifecycle.updateStudySettings(studyId, nestedSettings);
                     }
                 });
                 
@@ -172,6 +177,47 @@ const UserStudiesPanel = ({ onClose, sciChartSurface, candles, sessions = [] }) 
         
         // Reset input
         event.target.value = '';
+    };
+
+    /**
+     * Transform flat settings (from export) back to nested structure (for UI)
+     * Maps flat keys back to their section structure based on the study's UI schema
+     */
+    const transformFlatToNestedSettings = (studyId, flatSettings) => {
+        const study = UserStudyRegistry.getStudy(studyId);
+        if (!study) return flatSettings;
+
+        const config = study.getUIConfig();
+        if (!config || !config.settingsSchema) return flatSettings;
+
+        const nestedSettings = {};
+
+        // Create map of flat keys to their sections
+        const keyToSectionMap = {};
+        config.settingsSchema.forEach(section => {
+            if (section.type === 'section' && section.controls) {
+                section.controls.forEach(control => {
+                    keyToSectionMap[control.key] = section.key;
+                });
+            }
+        });
+
+        // Transform flat settings to nested structure
+        Object.entries(flatSettings).forEach(([key, value]) => {
+            const sectionKey = keyToSectionMap[key];
+            if (sectionKey) {
+                // Put in appropriate section
+                if (!nestedSettings[sectionKey]) {
+                    nestedSettings[sectionKey] = {};
+                }
+                nestedSettings[sectionKey][key] = value;
+            } else {
+                // Keep at root level if no section mapping found
+                nestedSettings[key] = value;
+            }
+        });
+
+        return nestedSettings;
     };
 
     const filteredStudies = getFilteredStudies();
