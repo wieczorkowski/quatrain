@@ -1,35 +1,25 @@
 /**
- * Opening Gaps Study v1.0 (User Study)
+ * Opening Gaps Study v2.0 - Plugin Architecture
  * 
  * Description: Tracks New Day Opening Gaps (NDOG), New Week Opening Gaps (NWOG), 
  *             and Event Horizon Price Delivery Array (EHPDA) levels based on ICT methodology
  * Author: Quatrain Development Team
  * Date: 2024-01-01
+ * Updated: 2024-12-XX - Converted to plugin architecture
  * 
- * Installation: Drop this file into src/userstudies/library/ and restart Quatrain
+ * Installation: Drop this file into /studies folder and reload or restart Quatrain
  * 
- * Requirements: None
+ * Requirements: None (dependencies injected by plugin system)
  * Performance: Efficient gap detection with proper WebGL memory management
  */
 
-import { BoxAnnotation, LineAnnotation, TextAnnotation } from 'scichart';
+// Dependencies will be injected by the plugin system
+// No imports needed - BoxAnnotation, LineAnnotation, TextAnnotation are provided in sandbox
 
 class OpeningGapsStudy {
     constructor() {
-        this.settings = {
-            enabled: true,
-            showNDOG: false, // Default unchecked
-            ndogAmount: 5,
-            ndogBullishColor: '#FFD700', // Medium yellow for NDOG bullish
-            ndogBearishColor: '#FFD700', // Medium yellow for NDOG bearish
-            showNWOG: true, // Default checked
-            nwogAmount: 5,
-            nwogBullishColor: '#ba68c8', // Magenta for NWOG bullish
-            nwogBearishColor: '#ba68c8', // Magenta for NWOG bearish
-            showEHPDA: true,
-            paneLabels: true,
-            ehpdaColor: '#808080', // Gray for EHPDA
-        };
+        // Initialize with UI schema defaults instead of hardcoded values
+        this.settings = this.getDefaultSettings();
         
         this.sciChartSurfaceRefs = null;
         this.timeframes = [];
@@ -44,6 +34,40 @@ class OpeningGapsStudy {
         // Annotation tracking for cleanup
         this.gapAnnotations = []; // Box and line annotations for gaps
         this.ehpdaAnnotations = []; // Line annotations for EHPDA
+    }
+
+    /**
+     * Get default settings from UI schema
+     * This ensures UI defaults are always applied, especially during hot reload
+     */
+    getDefaultSettings() {
+        const config = this.getUIConfig();
+        const defaults = {};
+        
+        // Extract defaults from UI schema
+        this.extractDefaults(config.settingsSchema, defaults);
+        
+        console.log('[DEBUG] 🎛️ OpeningGaps - Extracted UI schema defaults:', defaults);
+        return defaults;
+    }
+
+    /**
+     * Recursively extract default values from UI schema
+     */
+    extractDefaults(schema, defaults, prefix = '') {
+        if (!schema || !Array.isArray(schema)) return;
+        
+        schema.forEach(item => {
+            if (item.type === 'section' && item.controls) {
+                // Handle section with controls
+                this.extractDefaults(item.controls, defaults, prefix);
+            } else if (item.key && item.default !== undefined) {
+                // Extract default value
+                const key = prefix ? `${prefix}.${item.key}` : item.key;
+                defaults[item.key] = item.default;
+                console.log(`[DEBUG] 📋 OpeningGaps - Found default: ${item.key} = ${item.default}`);
+            }
+        });
     }
     
     /**
@@ -554,5 +578,9 @@ class OpeningGapsStudy {
     }
 }
 
-// Export as default for Quatrain auto-discovery
-export default new OpeningGapsStudy(); 
+// Export as object for plugin system compatibility
+// Plugin system will detect this pattern and return the instance
+const OpeningGapsStudyPlugin = new OpeningGapsStudy();
+
+// Return the plugin instance for the plugin loader
+OpeningGapsStudyPlugin; 

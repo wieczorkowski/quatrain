@@ -1,50 +1,60 @@
 /**
  * UserStudyLoader - Auto-discovery system for user studies
- * Automatically discovers and loads user studies from the library/ folder
+ * Now supports both internal library studies and external plugin studies
  */
 
 import UserStudyRegistry from './UserStudyRegistry';
+import ExternalPluginLoader from './ExternalPluginLoader';
 
 class UserStudyLoader {
     constructor() {
         this.loadedStudies = new Map();
         this.loadErrors = new Map();
         this.isLoaded = false;
+        
+        // Setup event listeners for hot reload integration
+        this.setupHotReloadIntegration();
     }
 
     /**
-     * Auto-discover and load all user studies from library folder
-     * Uses Webpack's require.context for dynamic imports
+     * Auto-discover and load all user studies
+     * Now loads from external plugin directory instead of webpack context
      */
     async loadUserStudies() {
-        console.log('Starting user study auto-discovery...');
+        console.log('[USER-STUDIES] 🚀 Starting user study auto-discovery...');
         
         try {
-            // Use require.context to dynamically discover study files
-            // This creates a context for all .js files in the library directory
-            const studyContext = this.createStudyContext();
+            // Load external plugins from /studies directory
+            await ExternalPluginLoader.loadExternalPlugins();
             
-            if (!studyContext) {
-                console.log('No user studies found in library directory');
-                return;
+            // Register all loaded plugins with the registry
+            const loadedPlugins = ExternalPluginLoader.getLoadedPlugins();
+            console.log('[USER-STUDIES] 📦 External plugins loaded:', loadedPlugins.length);
+            
+            for (const pluginInfo of loadedPlugins) {
+                if (UserStudyRegistry.registerStudy(pluginInfo.id, pluginInfo.plugin)) {
+                    this.loadedStudies.set(pluginInfo.id, {
+                        path: pluginInfo.filePath,
+                        study: pluginInfo.plugin,
+                        loadedAt: pluginInfo.loadedAt
+                    });
+                    console.log('[USER-STUDIES] ✅ Registered external plugin:', pluginInfo.id);
+                } else {
+                    this.loadErrors.set(pluginInfo.id, 'Failed to register with registry');
+                }
             }
-
-            const studyPaths = studyContext.keys();
-            console.log(`Found ${studyPaths.length} potential user studies:`, studyPaths);
-
-            // Load each discovered study
-            for (const studyPath of studyPaths) {
-                await this.loadStudyFromPath(studyContext, studyPath);
-            }
+            
+            // Setup file watcher for hot reload
+            ExternalPluginLoader.setupFileWatcher();
 
             this.isLoaded = true;
-            console.log(`User study loading complete. Loaded: ${this.loadedStudies.size}, Errors: ${this.loadErrors.size}`);
+            console.log(`[USER-STUDIES] ✅ User study loading complete. Loaded: ${this.loadedStudies.size}, Errors: ${this.loadErrors.size}`);
             
             // Log summary
             this.logLoadingSummary();
 
         } catch (error) {
-            console.error('Error during user study auto-discovery:', error);
+            console.error('[USER-STUDIES] ❌ Error during user study auto-discovery:', error);
         }
     }
 
@@ -209,10 +219,10 @@ class UserStudyLoader {
 
     /**
      * Reload all user studies
-     * Useful for development or when studies are updated
+     * Now reloads external plugins with hot reload capability
      */
     async reloadUserStudies() {
-        console.log('Reloading all user studies...');
+        console.log('[USER-STUDIES] 🔄 Reloading all user studies...');
         
         // Clear existing studies
         UserStudyRegistry.clear();
@@ -220,7 +230,10 @@ class UserStudyLoader {
         this.loadErrors.clear();
         this.isLoaded = false;
         
-        // Reload
+        // Reload external plugins
+        await ExternalPluginLoader.reloadAllPlugins();
+        
+        // Reload through normal process
         await this.loadUserStudies();
     }
 
@@ -229,12 +242,22 @@ class UserStudyLoader {
      * @returns {Object} - Loading status information
      */
     getLoadingStatus() {
+        const externalStatus = ExternalPluginLoader.getLoadingStatus();
+        
         return {
             isLoaded: this.isLoaded,
             loadedCount: this.loadedStudies.size,
             errorCount: this.loadErrors.size,
             loadedStudies: Array.from(this.loadedStudies.keys()),
-            errors: Object.fromEntries(this.loadErrors)
+            errors: Object.fromEntries(this.loadErrors),
+            
+            // Include external plugin status
+            external: {
+                pluginDirectory: externalStatus.pluginDirectory,
+                externalLoadedCount: externalStatus.loadedCount,
+                externalErrorCount: externalStatus.errorCount,
+                externalErrors: externalStatus.errors
+            }
         };
     }
 
@@ -253,6 +276,77 @@ class UserStudyLoader {
             console.log('Then place your .js study files in the library directory.');
             console.log('Studies will be auto-discovered on next Quatrain restart.');
             return false;
+        }
+    }
+
+    /**
+     * Setup event listeners for hot reload integration
+     */
+    setupHotReloadIntegration() {
+        if (typeof window !== 'undefined') {
+            // Listen for plugin reintegration events from ExternalPluginLoader
+            window.addEventListener('pluginReintegrationNeeded', (event) => {
+                const { pluginId, plugin } = event.detail;
+                console.log('[USER-STUDIES] 🔄 Received plugin reintegration request:', pluginId);
+                this.handlePluginReintegration(pluginId, plugin);
+            });
+            
+            console.log('[USER-STUDIES] 👂 Hot reload integration listeners setup');
+        }
+    }
+
+    /**
+     * Handle plugin reintegration after hot reload
+     */
+    async handlePluginReintegration(pluginId, plugin) {
+        console.log('[USER-STUDIES] 🔄 Handling plugin reintegration:', pluginId);
+        
+        try {
+            // Re-register with the registry
+            if (UserStudyRegistry.registerStudy(pluginId, plugin)) {
+                this.loadedStudies.set(pluginId, {
+                    path: `hot-reloaded-${pluginId}`,
+                    study: plugin,
+                    loadedAt: new Date()
+                });
+                
+                console.log('[USER-STUDIES] ✅ Plugin re-registered:', pluginId);
+                
+                // Get current chart context from UserStudyLifecycle singleton
+                const UserStudyLifecycle = (await import('./UserStudyLifecycle')).default;
+                const context = UserStudyLifecycle.getCurrentContext();
+                
+                if (context.initialized && context.sciChartSurfaceRefs) {
+                    console.log('[USER-STUDIES] 🔄 Re-initializing plugin with current chart context');
+                    
+                    // Initialize the reloaded plugin with current context
+                    const settings = plugin.getSettings();
+                    if (settings.enabled) {
+                        plugin.initialize(
+                            context.sciChartSurfaceRefs,
+                            context.timeframes,
+                            context.currentChartData,
+                            context.currentSessions
+                        );
+                        
+                        console.log('[USER-STUDIES] ✅ Plugin re-initialized successfully:', pluginId);
+                    } else {
+                        console.log('[USER-STUDIES] ⏭️ Plugin is disabled, skipping initialization:', pluginId);
+                    }
+                } else {
+                    console.log('[USER-STUDIES] ⚠️ Lifecycle not initialized, plugin will initialize on next data update');
+                }
+                
+                this.loadErrors.delete(pluginId);
+                
+            } else {
+                this.loadErrors.set(pluginId, 'Failed to re-register after hot reload');
+                console.error('[USER-STUDIES] ❌ Failed to re-register plugin:', pluginId);
+            }
+            
+        } catch (error) {
+            console.error('[USER-STUDIES] ❌ Error during plugin reintegration:', error);
+            this.loadErrors.set(pluginId, error.message);
         }
     }
 

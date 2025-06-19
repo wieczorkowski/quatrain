@@ -1,29 +1,24 @@
 /**
- * High/Low Tracker Study v1.0
+ * High/Low Tracker Study v2.0 - Plugin Architecture
  * 
  * Description: Tracks the highest and lowest prices over a configurable lookback period
  * Author: Quatrain Development Team
  * Date: 2024-01-01
+ * Updated: 2024-12-XX - Converted to plugin architecture
  * 
- * Installation: Drop this file into src/userstudies/library/ and restart Quatrain
+ * Installation: Drop this file into /studies folder and reload or restart Quatrain
  * 
- * Requirements: None
+ * Requirements: None (dependencies injected by plugin system)
  * Performance: Very lightweight - only 2 annotations total per timeframe
  */
 
-import { HorizontalLineAnnotation, ELabelPlacement } from 'scichart';
+// Dependencies will be injected by the plugin system
+// No imports needed - HorizontalLineAnnotation and ELabelPlacement are provided in sandbox
 
 class HighLowTracker {
     constructor() {
-        this.settings = {
-            enabled: true,
-            lookbackPeriod: 10,
-            highColor: '#00FF00',
-            lowColor: '#FF0000',
-            lineStyle: 'solid',
-            thickness: 2,
-            showLabels: true
-        };
+        // Initialize with UI schema defaults instead of hardcoded values
+        this.settings = this.getDefaultSettings();
         
         // Store annotations per timeframe
         this.annotations = {};
@@ -35,6 +30,40 @@ class HighLowTracker {
         
         // Cache for performance per timeframe
         this.lastCalculated = {};
+    }
+
+    /**
+     * Get default settings from UI schema
+     * This ensures UI defaults are always applied, especially during hot reload
+     */
+    getDefaultSettings() {
+        const config = this.getUIConfig();
+        const defaults = {};
+        
+        // Extract defaults from UI schema
+        this.extractDefaults(config.settingsSchema, defaults);
+        
+        console.log('[DEBUG] 🎛️ Extracted UI schema defaults:', defaults);
+        return defaults;
+    }
+
+    /**
+     * Recursively extract default values from UI schema
+     */
+    extractDefaults(schema, defaults, prefix = '') {
+        if (!schema || !Array.isArray(schema)) return;
+        
+        schema.forEach(item => {
+            if (item.type === 'section' && item.controls) {
+                // Handle section with controls
+                this.extractDefaults(item.controls, defaults, prefix);
+            } else if (item.key && item.default !== undefined) {
+                // Extract default value
+                const key = prefix ? `${prefix}.${item.key}` : item.key;
+                defaults[item.key] = item.default;
+                console.log(`[DEBUG] 📋 Found default: ${item.key} = ${item.default}`);
+            }
+        });
     }
 
     /**
@@ -480,5 +509,9 @@ class HighLowTracker {
     }
 }
 
-// Export as default for Quatrain auto-discovery
-export default new HighLowTracker(); 
+// Export as object for plugin system compatibility
+// Plugin system will detect this pattern and return the instance
+const HighLowTrackerPlugin = new HighLowTracker();
+
+// Return the plugin instance for the plugin loader
+HighLowTrackerPlugin; 

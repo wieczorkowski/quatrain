@@ -397,4 +397,137 @@
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* Error Log Modal */
+.error-log-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1001;
+}
+
+.error-log-modal {
+    width: 80%;
+    max-width: 800px;
+    height: 70%;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+    border: 1px solid #444;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.error-log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background: linear-gradient(90deg, #333 0%, #444 100%);
+    border-bottom: 1px solid #555;
+}
+
+.error-log-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #ff6b6b;
+}
+
+.error-log-content {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    background: #1a1a1a;
+}
+
+.error-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.error-entry {
+    background: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.3);
+    border-radius: 6px;
+    padding: 15px;
+}
+
+.error-plugin-name {
+    font-weight: 600;
+    font-size: 16px;
+    color: #ff6b6b;
+    margin-bottom: 8px;
+}
+
+.error-message {
+    font-family: 'Courier New', monospace;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 10px;
+    border-radius: 4px;
+    color: #ffaaaa;
+    font-size: 13px;
+    line-height: 1.4;
+    margin-bottom: 8px;
+    word-break: break-word;
+}
+
+.error-timestamp {
+    font-size: 11px;
+    color: #888;
+    text-align: right;
+}
+
+.no-errors {
+    text-align: center;
+    color: #888;
+    font-style: italic;
+    padding: 40px;
+}
+
+.error-log-footer {
+    padding: 15px 20px;
+    background: #2a2a2a;
+    border-top: 1px solid #444;
+}
+
+.error-log-help {
+    font-size: 12px;
+    color: #ccc;
+}
+
+.error-log-help strong {
+    color: #ffffff;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.error-log-help ul {
+    margin: 0;
+    padding-left: 16px;
+}
+
+.error-log-help li {
+    margin-bottom: 4px;
+    color: #aaa;
+}
+
+.error-log-button {
+    background: #dc3545 !important;
+    border-color: #c82333 !important;
+}
+
+.error-log-button:hover {
+    background: #c82333 !important;
+    border-color: #bd2130 !important;
 } 

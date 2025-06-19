@@ -1,18 +1,28 @@
-﻿# Quatrain Study Development Guide
+﻿# Quatrain Study Development Guide - Plugin Architecture
 
 ## Overview
 
-This guide provides comprehensive instructions for developing drop-in study modules for Quatrain. Studies are self-contained JavaScript modules that analyze trading data and create chart annotations or indicators.
+This guide provides comprehensive instructions for developing drop-in study plugins for Quatrain. Studies are self-contained JavaScript modules that analyze trading data and create chart annotations or indicators using Quatrain's **External Plugin Architecture**.
+
+## Plugin Architecture Overview
+
+Quatrain now uses a **plugin-based architecture** that allows studies to be loaded dynamically from external files without requiring a build process. This provides:
+
+- **No Build Required**: Drop `.js` files directly into the `/studies` folder
+- **Hot Reload**: Changes take effect immediately with the reload button  
+- **Dependency Injection**: SciChart classes are provided automatically
+- **External Loading**: Studies load from filesystem, not webpack bundles
+- **TradingView-like Experience**: Easy study distribution and modification
 
 ## System Requirements and Setup
 
-Before developing studies, ensure you understand the system requirements:
+### Prerequisites
 
 1. **JavaScript ES6+**: Studies are written in modern JavaScript
-2. **SciChart Integration**: Studies create annotations using the SciChart library
-3. **File Placement**: Studies must be placed in `src/userstudies/library/` directory
+2. **No Imports Required**: SciChart classes are injected by the plugin system
+3. **File Placement**: Studies must be placed in `/studies/` directory (workspace root)
 4. **Auto-Discovery**: Studies are automatically discovered and loaded by Quatrain
-5. **Hot Reload**: Restart Quatrain to reload modified studies
+5. **Instant Reload**: Use the reload button (🔄) for immediate updates
 
 ### Enable User Studies System
 
@@ -23,31 +33,103 @@ const ENABLE_USER_STUDIES = true; // Line 1 of App.js
 ```
 
 When enabled, the system:
-- Auto-discovers studies in `src/userstudies/library/`
-- Provides a separate "User Studies" panel (distinct from "Indicators and Studies")
-- Manages study lifecycle automatically
+- Auto-discovers studies in `/studies/` directory (external to build system)
+- Provides a separate "User Studies" panel (distinct from "Indicators and Studies")  
+- Manages study lifecycle automatically with hot reload support
 - Generates UI dynamically from study schemas
+- Provides comprehensive error logging for plugin development
 
-## Core Architecture
+## Plugin Architecture Details
 
-### Study Interface
+### External Plugin Loading System
 
-Every Quatrain study must implement the following standardized interface:
+The plugin system uses a sophisticated **dependency injection** approach:
+
+1. **File System Loading**: Studies load directly from `/studies/` directory using Node.js file system
+2. **Runtime Evaluation**: Code is evaluated in a sandboxed environment with injected dependencies
+3. **Hot Reload**: File watcher detects changes and reloads plugins instantly
+4. **Dependency Injection**: All SciChart classes are provided without imports
+5. **Error Handling**: Comprehensive error logging with detailed debugging information
+
+### Available SciChart Classes (Auto-Injected)
+
+The plugin system automatically provides these SciChart classes:
+
+**Annotation Classes:**
+- `HorizontalLineAnnotation` - Horizontal lines with labels
+- `VerticalLineAnnotation` - Vertical lines with labels  
+- `LineAnnotation` - Lines between two points
+- `BoxAnnotation` - Rectangle annotations
+- `TextAnnotation` - Text labels
+- `CustomAnnotation` - SVG-based custom shapes
+- `AxisMarkerAnnotation` - Axis markers
+- `NativeTextAnnotation` - High-performance text
+
+**Configuration Enums:**
+- `ELabelPlacement` - Label positioning (BottomRight, TopLeft, etc.)
+- `EHorizontalAnchorPoint` - Horizontal anchoring
+- `EVerticalAnchorPoint` - Vertical anchoring
+- `EAnnotationLayer` - Layer control (BelowChart, AboveChart, etc.)
+- `ECoordinateMode` - Coordinate modes (DataValue, Relative, Pixel)
+
+**Utilities:**
+- `NumberRange` - Number range utilities
+- `Point` - Point geometry
+
+### Study Class Interface
+
+Every Quatrain plugin study must be implemented as a **class** with the following interface:
 
 ```javascript
-export default {
-    // Core lifecycle methods
-    initialize: (sciChartSurfaceRefs, timeframes, chartData, sessions) => {},
-    updateData: (chartData, sessions) => {},
-    destroy: () => {},
+class MyStudy {
+    constructor() {
+        // Initialize with UI schema defaults (CRITICAL!)
+        this.settings = this.getDefaultSettings();
+        
+        // Initialize plugin state
+        this.sciChartSurfaceRefs = null;
+        this.timeframes = [];
+        this.chartData = {};
+        this.sessions = [];
+        this.annotations = [];
+    }
+
+    // REQUIRED: Extract defaults from UI schema
+    getDefaultSettings() {
+        const config = this.getUIConfig();
+        const defaults = {};
+        this.extractDefaults(config.settingsSchema, defaults);
+        return defaults;
+    }
+
+    extractDefaults(schema, defaults, prefix = '') {
+        if (!schema || !Array.isArray(schema)) return;
+        
+        schema.forEach(item => {
+            if (item.type === 'section' && item.controls) {
+                this.extractDefaults(item.controls, defaults, prefix);
+            } else if (item.key && item.default !== undefined) {
+                defaults[item.key] = item.default;
+            }
+        });
+    }
+
+    // Core lifecycle methods (REQUIRED)
+    initialize(sciChartSurfaceRefs, timeframes, chartData, sessions) { /* ... */ }
+    updateData(chartData, sessions) { /* ... */ }
+    destroy() { /* ... */ }
     
-    // Settings management
-    getSettings: () => {},
-    updateSettings: (newSettings) => {},
+    // Settings management (REQUIRED)
+    getSettings() { /* ... */ }
+    updateSettings(newSettings) { /* ... */ }
     
-    // UI configuration
-    getUIConfig: () => {}
-};
+    // UI configuration (REQUIRED)
+    getUIConfig() { /* ... */ }
+}
+
+// CRITICAL: Plugin export pattern
+const MyStudyPlugin = new MyStudy();
+MyStudyPlugin;
 ```
 
 ## Required Methods
@@ -284,16 +366,12 @@ const previousCandle = oneMinData[oneMinData.length - 2];
 
 ### Creating Annotations
 
-Use SciChart annotation objects to visualize your analysis:
+Use SciChart annotation objects to visualize your analysis. **No imports needed** - all classes are auto-injected:
 
 ```javascript
-import { 
-    HorizontalLineAnnotation, 
-    LineAnnotation, 
-    BoxAnnotation, 
-    TextAnnotation,
-    ELabelPlacement 
-} from 'scichart';
+// NO IMPORTS REQUIRED - Classes are provided by plugin system
+// HorizontalLineAnnotation, LineAnnotation, BoxAnnotation, TextAnnotation, 
+// ELabelPlacement, etc. are all available automatically
 
 createHorizontalLine(price, color, label) {
     this.timeframes.forEach(timeframe => {
@@ -314,6 +392,49 @@ createHorizontalLine(price, color, label) {
         
         surface.annotations.add(annotation);
         this.annotations.push(annotation); // Track for cleanup
+    });
+}
+
+// Example using different annotation types
+createComplexAnnotation(startTime, endTime, highPrice, lowPrice) {
+    // Box annotation for price range
+    const box = new BoxAnnotation({
+        id: `myStudy_box_${Date.now()}`,
+        x1: startTime,
+        y1: highPrice,
+        x2: endTime,
+        y2: lowPrice,
+        fill: '#0066CC33',  // Semi-transparent blue
+        stroke: '#0066CC',
+        annotationLayer: EAnnotationLayer.BelowChart,
+        xAxisId: 'xAxis',
+        yAxisId: 'yAxis'
+    });
+    
+    // Line annotation for trend
+    const trendLine = new LineAnnotation({
+        id: `myStudy_trend_${Date.now()}`,
+        x1: startTime,
+        y1: highPrice,
+        x2: endTime,
+        y2: lowPrice,
+        stroke: '#FF6600',
+        strokeThickness: 2,
+        xAxisId: 'xAxis',
+        yAxisId: 'yAxis'
+    });
+    
+    // Custom text annotation
+    const label = new NativeTextAnnotation({
+        id: `myStudy_label_${Date.now()}`,
+        x1: endTime,
+        y1: highPrice,
+        text: 'Signal Alert',
+        fontSize: 12,
+        textColor: '#FFFFFF',
+        backgroundColor: '#FF0000',
+        xAxisId: 'xAxis',
+        yAxisId: 'yAxis'
     });
 }
 ```
@@ -495,65 +616,166 @@ The UI system supports the following control types:
 
 **Critical**: Always implement proper flattening in your `updateSettings()` method!
 
-## File Organization and Auto-Discovery
+## File Organization and Plugin System
 
 ### Directory Structure
 
-Studies must be placed in the correct directory for auto-discovery:
+Studies must be placed in the external plugin directory for auto-discovery:
 
 ```
-src/
-├── userstudies/
-│   ├── library/                    ← YOUR STUDIES GO HERE
-│   │   ├── MyCustomStudy.js       ← Drop study files here
-│   │   ├── AdvancedStrategy.js
-│   │   └── HighLowTracker.js      ← Example study
-│   ├── core/                      ← System files (don't modify)
-│   │   ├── UserStudyRegistry.js
-│   │   ├── UserStudyLoader.js
-│   │   └── UserStudyLifecycle.js
-│   └── components/                ← UI files (don't modify)
-│       ├── UserStudiesPanel.js
-│       └── UserStudyUI.js
+workspace-root/
+├── studies/                        ← YOUR PLUGINS GO HERE (External to build)
+│   ├── MyCustomStudy.js           ← Drop plugin files here  
+│   ├── AdvancedStrategy.js
+│   ├── HighLowTracker.js          ← Example plugin
+│   └── OpeningGapsStudy.js        ← Complex example plugin
+├── src/                           ← Build system (don't put plugins here)
+│   ├── userstudies/
+│   │   ├── core/                  ← System files (don't modify)
+│   │   │   ├── ExternalPluginLoader.js
+│   │   │   ├── UserStudyRegistry.js
+│   │   │   ├── UserStudyLoader.js
+│   │   │   └── UserStudyLifecycle.js
+│   │   └── components/            ← UI files (don't modify)
+│   │       ├── UserStudiesPanel.js
+│   │       └── UserStudyUI.js
 ```
 
-### File Naming and Export Requirements
+### Plugin File Requirements
 
-1. **File Location**: Must be in `src/userstudies/library/`
+1. **File Location**: Must be in `/studies/` directory (workspace root)
 2. **File Extension**: Must use `.js` extension
-3. **Export Pattern**: Must use `export default` with study instance
-4. **Study ID**: Extracted from filename (e.g., `MyStudy.js` → `MyStudy`)
+3. **Export Pattern**: Must use **plugin instantiation pattern** (see below)
+4. **No Imports**: All SciChart classes are injected automatically
+5. **Study ID**: Extracted from filename (e.g., `MyStudy.js` → `MyStudy`)
 
-**Correct Export Pattern:**
+### CRITICAL: Plugin Export Pattern
+
+**The plugin system requires a specific export pattern:**
+
 ```javascript
+/**
+ * My Custom Study Plugin v1.0
+ * 
+ * Installation: Drop this file into /studies folder and reload
+ * Dependencies: None (all injected by plugin system)
+ */
+
+// NO IMPORTS NEEDED - SciChart classes are auto-injected
+// HorizontalLineAnnotation, BoxAnnotation, etc. are available
+
 class MyCustomStudy {
-    // ... implementation
+    constructor() {
+        // CRITICAL: Use UI schema defaults for hot reload compatibility
+        this.settings = this.getDefaultSettings();
+        
+        // Initialize plugin state
+        this.sciChartSurfaceRefs = null;
+        this.timeframes = [];
+        this.chartData = {};
+        this.sessions = [];
+        this.annotations = [];
+    }
+    
+    getDefaultSettings() {
+        const config = this.getUIConfig();
+        const defaults = {};
+        this.extractDefaults(config.settingsSchema, defaults);
+        return defaults;
+    }
+    
+    extractDefaults(schema, defaults, prefix = '') {
+        if (!schema || !Array.isArray(schema)) return;
+        
+        schema.forEach(item => {
+            if (item.type === 'section' && item.controls) {
+                this.extractDefaults(item.controls, defaults, prefix);
+            } else if (item.key && item.default !== undefined) {
+                defaults[item.key] = item.default;
+            }
+        });
+    }
+    
+    // ... implement all required methods
 }
 
-// Export as default for Quatrain auto-discovery
+// CRITICAL: Plugin export pattern (not ES6 export!)
+const MyCustomStudyPlugin = new MyCustomStudy();
+
+// Return the plugin instance for the plugin loader
+MyCustomStudyPlugin;
+```
+
+**❌ Wrong Export Patterns (Don't Use):**
+```javascript
+// DON'T USE - ES6 export default with class
+export default MyCustomStudy;
+
+// DON'T USE - ES6 export default with instance  
 export default new MyCustomStudy();
+
+// DON'T USE - CommonJS module.exports
+module.exports = MyCustomStudy;
 ```
 
 ### Hot Reload and Development
 
-1. **Modify Study**: Edit your study file in `src/userstudies/library/`
-2. **Restart Quatrain**: Changes require Quatrain restart to take effect
-3. **Check Loading**: Use browser console to see loading status
-4. **Debug Issues**: Check User Studies panel for error messages
+1. **Modify Plugin**: Edit your plugin file in `/studies/` directory
+2. **Reload Instantly**: Click the reload button (🔄) in User Studies panel
+3. **Check Loading**: Console shows detailed loading status
+4. **Debug Issues**: Click error log button (⚠️) for detailed error information
+5. **No Build Required**: Changes take effect immediately
 
-### Loading Status and Debugging
+### Plugin Loading Process
 
-The system provides detailed loading information:
+The plugin system follows this sequence:
 
+1. **File Discovery**: Scans `/studies/` directory for `.js` files
+2. **Code Reading**: Reads plugin file from filesystem  
+3. **Dependency Injection**: Creates sandbox with SciChart classes
+4. **Code Evaluation**: Executes plugin code in sandboxed environment
+5. **Plugin Extraction**: Looks for instantiated plugin at end of file
+6. **Interface Validation**: Verifies all required methods are present
+7. **Registration**: Adds plugin to registry for UI and lifecycle management
+8. **Hot Reload Setup**: Watches file for changes
+
+### Loading Status and Error Debugging
+
+The plugin system provides comprehensive error logging and debugging:
+
+**Console Output:**
 ```javascript
-// Console output shows:
-// ✓ Successfully loaded user study: MyStudy
-// ✗ Error loading user study BadStudy: Missing required method
+// Plugin loading shows detailed status:
+[PLUGIN-LOADER] 🚀 ExternalPluginLoader initialized
+[PLUGIN-LOADER] 📁 Plugin directory: C:\workspace\studies
+[PLUGIN-LOADER] 🎨 Available annotation classes: HorizontalLineAnnotation, LineAnnotation, BoxAnnotation...
+[PLUGIN-LOADER] 📦 Loading plugin: MyStudy from C:\workspace\studies\MyStudy.js
+[PLUGIN-LOADER] ✅ Successfully loaded plugin: MyStudy
+[PLUGIN-LOADER] ❌ Error loading plugin BadStudy: Missing required method
+```
 
-// In User Studies panel:
-// - Green status = study loaded successfully
-// - Red status = loading errors (hover for details)
-// - Reload button = refresh all studies
+**User Studies Panel Status:**
+- **Plugin count**: Shows loaded vs total plugins in header
+- **Error button (⚠️)**: Appears when loading errors occur
+- **Error log modal**: Click ⚠️ for detailed error information with:
+  - Plugin name that failed
+  - Detailed error message  
+  - Troubleshooting tips
+  - Common solutions for plugin issues
+- **Reload button (🔄)**: Instant reload without restarting Quatrain
+
+**Error Log Features:**
+```javascript
+// Example error log display:
+Plugin: BadStudy  
+Error: ReferenceError: LineAnnotation is not defined
+Timestamp: 3:45:12 PM
+
+Common Issues:
+• Missing export statement: Add instantiated plugin at end of file
+• Invalid plugin interface: Ensure all required methods are implemented  
+• Syntax errors: Check console for detailed JavaScript errors
+• Import issues: Remove ES6 imports - dependencies are injected
 ```
 
 ## Performance Guidelines
@@ -1734,23 +1956,310 @@ The system maintains complete separation from existing studies:
 4. **Isolated Lifecycle**: Independent initialization and cleanup
 5. **Zero Interference**: Cannot affect existing study functionality
 
-## Distribution and Deployment
+## Plugin Development Workflow
 
-Studies can be distributed as single `.js` files that users drop into their `src/userstudies/library/` directory. Include documentation comments in your study file:
+### Step-by-Step Plugin Creation
+
+1. **Create Plugin File**: Create a new `.js` file in `/studies/` directory
+2. **Define Class**: Implement plugin class with required methods
+3. **Add UI Schema**: Define settings controls and defaults  
+4. **Export Plugin**: Use the correct instantiation export pattern
+5. **Test Loading**: Use reload button to test plugin loading
+6. **Debug Errors**: Use error log (⚠️) to diagnose issues
+7. **Iterate Quickly**: Modify code and reload instantly
+
+### Quick Start Template
 
 ```javascript
 /**
- * My Custom Study v1.0
+ * Template Plugin v1.0
  * 
- * Description: This study analyzes price patterns and creates annotations
- * Author: Your Name
- * Date: 2024-01-01
+ * Installation: Drop this file into /studies folder and reload Quatrain
+ * Dependencies: None (all injected by plugin system)
+ */
+
+class TemplateStudy {
+    constructor() {
+        this.settings = this.getDefaultSettings();
+        this.sciChartSurfaceRefs = null;
+        this.timeframes = [];
+        this.chartData = {};
+        this.sessions = [];
+        this.annotations = [];
+    }
+
+    getDefaultSettings() {
+        const config = this.getUIConfig();
+        const defaults = {};
+        this.extractDefaults(config.settingsSchema, defaults);
+        return defaults;
+    }
+
+    extractDefaults(schema, defaults) {
+        if (!schema || !Array.isArray(schema)) return;
+        schema.forEach(item => {
+            if (item.type === 'section' && item.controls) {
+                this.extractDefaults(item.controls, defaults);
+            } else if (item.key && item.default !== undefined) {
+                defaults[item.key] = item.default;
+            }
+        });
+    }
+
+    initialize(sciChartSurfaceRefs, timeframes, chartData, sessions) {
+        this.sciChartSurfaceRefs = sciChartSurfaceRefs;
+        this.timeframes = timeframes;
+        this.chartData = chartData;
+        this.sessions = sessions;
+        
+        if (this.settings.enabled) {
+            this.createAnnotations();
+        }
+    }
+
+    updateData(chartData, sessions) {
+        this.chartData = chartData;
+        this.sessions = sessions;
+        
+        if (this.settings.enabled && this.sciChartSurfaceRefs) {
+            this.updateAnnotations();
+        }
+    }
+
+    destroy() {
+        this.removeAllAnnotations();
+        this.chartData = null;
+        this.sessions = null;
+        this.sciChartSurfaceRefs = null;
+        this.annotations = [];
+    }
+
+    getSettings() {
+        return { ...this.settings };
+    }
+
+    updateSettings(newSettings) {
+        // Flatten nested settings from UI
+        const flattened = { ...newSettings };
+        if (newSettings.main) {
+            Object.assign(flattened, newSettings.main);
+            delete flattened.main;
+        }
+        
+        this.settings = { ...this.settings, ...flattened };
+        
+        if (this.sciChartSurfaceRefs) {
+            this.removeAllAnnotations();
+            if (this.settings.enabled) {
+                this.createAnnotations();
+            }
+        }
+    }
+
+    getUIConfig() {
+        return {
+            id: 'templateStudy',
+            displayName: 'Template Study',
+            description: 'A template for creating new studies',
+            category: 'examples',
+            settingsSchema: [{
+                type: 'section',
+                title: 'Main Settings',
+                key: 'main',
+                controls: [{
+                    key: 'enabled',
+                    type: 'checkbox',
+                    label: 'Enable Study',
+                    default: true
+                }]
+            }]
+        };
+    }
+
+    createAnnotations() {
+        // Your annotation logic here
+        // All SciChart classes are available: HorizontalLineAnnotation, etc.
+    }
+
+    updateAnnotations() {
+        this.removeAllAnnotations();
+        this.createAnnotations();
+    }
+
+    removeAllAnnotations() {
+        this.timeframes.forEach(timeframe => {
+            const surface = this.sciChartSurfaceRefs[timeframe];
+            if (!surface) return;
+
+            const toRemove = [];
+            surface.annotations.asArray().forEach(annotation => {
+                if (annotation.id && annotation.id.startsWith('template_')) {
+                    toRemove.push(annotation);
+                }
+            });
+
+            toRemove.forEach(annotation => {
+                surface.annotations.remove(annotation);
+                if (annotation.delete) annotation.delete();
+            });
+        });
+        this.annotations = [];
+    }
+}
+
+// CRITICAL: Plugin export pattern
+const TemplateStudyPlugin = new TemplateStudy();
+TemplateStudyPlugin;
+```
+
+## Distribution and Deployment
+
+Plugins can be distributed as single `.js` files that users drop into their `/studies/` directory. Include comprehensive documentation comments:
+
+```javascript
+/**
+ * My Custom Plugin v2.0 - Plugin Architecture
  * 
- * Installation: Drop this file into src/userstudies/library/ and restart Quatrain
+ * Description: Advanced price pattern analysis with dynamic annotations
+ * Author: Your Name  
+ * Date: 2024-12-XX
+ * Updated: Plugin architecture migration
  * 
- * Requirements: None
- * Performance: Lightweight - suitable for real-time use
+ * Installation: Drop this file into /studies folder and reload Quatrain
+ * 
+ * Requirements: None (dependencies injected by plugin system)
+ * Performance: Optimized for real-time use with caching
+ * Compatibility: Plugin architecture v2.0+
+ * 
+ * Features:
+ * - Hot reload support
+ * - UI schema defaults
+ * - Comprehensive error handling
+ * - Multi-timeframe support
  */
 ```
 
-This guide provides everything needed to create professional-quality studies that integrate seamlessly with Quatrain's architecture while maintaining high performance and reliability.
+### Plugin Distribution Benefits
+
+- **Single File**: Complete plugin in one `.js` file
+- **No Build Process**: Users drop file and reload immediately  
+- **Easy Sharing**: Send via email, GitHub, forums, etc.
+- **Version Control**: File-based versioning and updates
+- **Cross-Platform**: Works on Windows, Mac, Linux
+- **TradingView-like**: Familiar plugin ecosystem model
+
+## Migration from Old System
+
+### Converting Existing Studies to Plugins
+
+If you have existing studies from the old `src/userstudies/library/` system, follow these steps:
+
+1. **Move File**: Copy from `src/userstudies/library/` to `/studies/`
+2. **Remove Imports**: Delete all ES6 import statements
+3. **Fix Constructor**: Use `this.settings = this.getDefaultSettings()` 
+4. **Add Default Methods**: Add `getDefaultSettings()` and `extractDefaults()`
+5. **Update Export**: Change to plugin instantiation pattern
+6. **Test Hot Reload**: Verify UI defaults work during reload
+
+**Migration Example:**
+
+```javascript
+// OLD SYSTEM (don't use)
+import { HorizontalLineAnnotation, ELabelPlacement } from 'scichart';
+
+class MyStudy {
+    constructor() {
+        this.settings = {
+            enabled: true,
+            color: '#FF0000'  // Hardcoded defaults
+        };
+    }
+}
+
+export default new MyStudy();
+
+// NEW PLUGIN SYSTEM (use this)
+// NO IMPORTS - Classes auto-injected
+
+class MyStudy {
+    constructor() {
+        this.settings = this.getDefaultSettings();  // Dynamic defaults
+    }
+    
+    getDefaultSettings() {
+        const config = this.getUIConfig();
+        const defaults = {};
+        this.extractDefaults(config.settingsSchema, defaults);
+        return defaults;
+    }
+    
+    extractDefaults(schema, defaults) {
+        // Extract from UI schema for hot reload compatibility
+    }
+}
+
+const MyStudyPlugin = new MyStudy();
+MyStudyPlugin;
+```
+
+### Common Plugin Patterns
+
+**Pattern 1: Simple Indicator Plugin**
+```javascript
+class SimpleMA {
+    constructor() {
+        this.settings = this.getDefaultSettings();
+        this.annotations = [];
+    }
+    
+    // Use HorizontalLineAnnotation for price levels
+    createMovingAverage() {
+        const data = this.chartData['1m'] || [];
+        const ma = this.calculateMA(data, this.settings.period);
+        
+        const annotation = new HorizontalLineAnnotation({
+            id: `ma_${Date.now()}`,
+            y1: ma,
+            stroke: this.settings.color,
+            xAxisId: 'xAxis',
+            yAxisId: 'yAxis'
+        });
+    }
+}
+```
+
+**Pattern 2: Multi-Timeframe Plugin**
+```javascript
+class MultiTFStudy {
+    getValidTimeframes() {
+        // Filter timeframes based on study requirements
+        return this.timeframes.filter(tf => ['1m', '5m', '15m'].includes(tf));
+    }
+    
+    updateData(chartData, sessions) {
+        this.getValidTimeframes().forEach(timeframe => {
+            this.processTimeframe(timeframe, chartData[timeframe]);
+        });
+    }
+}
+```
+
+**Pattern 3: Session-Based Plugin**
+```javascript
+class SessionStudy {
+    getCurrentSession() {
+        return this.sessions.find(s => s.relativeNumber === 0);
+    }
+    
+    getSessionData(sessionNumber) {
+        const session = this.sessions.find(s => s.relativeNumber === sessionNumber);
+        const data = this.chartData['1m'] || [];
+        return data.filter(candle => 
+            candle.timestamp >= session.startTime &&
+            (session.endTime ? candle.timestamp <= session.endTime : true)
+        );
+    }
+}
+```
+
+This guide provides everything needed to create professional-quality plugins that integrate seamlessly with Quatrain's plugin architecture while maintaining high performance and reliability.

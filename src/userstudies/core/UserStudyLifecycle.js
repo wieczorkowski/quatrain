@@ -5,6 +5,7 @@
 
 import UserStudyRegistry from './UserStudyRegistry';
 import UserStudyLoader from './UserStudyLoader';
+import ExternalPluginLoader from './ExternalPluginLoader';
 
 class UserStudyLifecycle {
     constructor() {
@@ -15,6 +16,19 @@ class UserStudyLifecycle {
         this.currentSessions = [];
         this.updateQueue = [];
         this.isProcessingUpdates = false;
+    }
+
+    /**
+     * Get current chart context for hot reload integration
+     */
+    getCurrentContext() {
+        return {
+            initialized: this.initialized,
+            sciChartSurfaceRefs: this.sciChartSurfaceRefs,
+            timeframes: this.timeframes,
+            currentChartData: this.currentChartData,
+            currentSessions: this.currentSessions
+        };
     }
 
     /**
@@ -229,6 +243,9 @@ class UserStudyLifecycle {
 
             // Destroy all studies
             UserStudyRegistry.destroyAllStudies();
+
+            // Cleanup external plugin system
+            ExternalPluginLoader.destroy();
 
             // Clear references
             this.sciChartSurfaceRefs = null;

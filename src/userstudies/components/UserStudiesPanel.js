@@ -17,6 +17,7 @@ const UserStudiesPanel = ({ onClose, sciChartSurface, candles, sessions = [] }) 
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedStudies, setExpandedStudies] = useState(new Set());
     const [forceUpdateCounter, setForceUpdateCounter] = useState(0);
+    const [showErrorLog, setShowErrorLog] = useState(false);
 
     useEffect(() => {
         refreshStudies();
@@ -117,6 +118,14 @@ const UserStudiesPanel = ({ onClose, sciChartSurface, candles, sessions = [] }) 
         console.log('Reloading user studies...');
         await UserStudyLoader.reloadUserStudies();
         refreshStudies();
+    };
+
+    const showErrorLogModal = () => {
+        setShowErrorLog(true);
+    };
+
+    const closeErrorLog = () => {
+        setShowErrorLog(false);
     };
 
     const exportStudySettings = () => {
@@ -224,6 +233,15 @@ const UserStudiesPanel = ({ onClose, sciChartSurface, candles, sessions = [] }) 
                     >
                         🔄
                     </button>
+                    {loadingStatus && loadingStatus.errorCount > 0 && (
+                        <button 
+                            onClick={showErrorLogModal}
+                            className="action-button error-log-button"
+                            title={`View error log (${loadingStatus.errorCount} errors)`}
+                        >
+                            ⚠️
+                        </button>
+                    )}
                     <button 
                         onClick={exportStudySettings}
                         className="action-button export-button"
@@ -266,10 +284,16 @@ const UserStudiesPanel = ({ onClose, sciChartSurface, candles, sessions = [] }) 
                                 <h4>No User Studies Found</h4>
                                 <p>To add user studies:</p>
                                 <ol>
-                                    <li>Create the directory: <code>src/userstudies/library/</code></li>
+                                    <li>Create the directory: <code>studies/</code> in your workspace root</li>
                                     <li>Add your .js study files to this directory</li>
-                                    <li>Restart Quatrain or click the reload button</li>
+                                    <li>Click the reload button (🔄) or restart Quatrain</li>
                                 </ol>
+                                {loadingStatus && loadingStatus.external && (
+                                    <div className="plugin-status">
+                                        <p><strong>Plugin Directory:</strong> {loadingStatus.external.pluginDirectory}</p>
+                                        <p><strong>Status:</strong> Looking for plugins in external directory...</p>
+                                    </div>
+                                )}
                                 <p>See the development guide for creating studies.</p>
                             </div>
                         ) : (
@@ -327,11 +351,58 @@ const UserStudiesPanel = ({ onClose, sciChartSurface, candles, sessions = [] }) 
             <div className="user-studies-footer">
                 <div className="status-info">
                     Studies: {filteredStudies.length} shown, {studies.length} total
+                    {loadingStatus && loadingStatus.external && (
+                        <span className="plugin-info">
+                            {' | '}Plugin Dir: {loadingStatus.external.pluginDirectory}
+                            {loadingStatus.external.externalLoadedCount > 0 && 
+                                ` | ${loadingStatus.external.externalLoadedCount} external plugins`}
+                            {loadingStatus.external.externalErrorCount > 0 && 
+                                ` | ${loadingStatus.external.externalErrorCount} errors`}
+                        </span>
+                    )}
                 </div>
                 <div className="help-info">
-                    Need help? Check the User Studies development guide.
+                    Plugin System: Drop .js files in /studies folder for hot reload
                 </div>
             </div>
+
+            {/* Error Log Modal */}
+            {showErrorLog && (
+                <div className="error-log-modal-overlay" onClick={closeErrorLog}>
+                    <div className="error-log-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="error-log-header">
+                            <h3>Plugin Loading Error Log</h3>
+                            <button className="close-button" onClick={closeErrorLog}>×</button>
+                        </div>
+                        <div className="error-log-content">
+                            {loadingStatus && loadingStatus.errors && Object.keys(loadingStatus.errors).length > 0 ? (
+                                <div className="error-list">
+                                    {Object.entries(loadingStatus.errors).map(([pluginId, error]) => (
+                                        <div key={pluginId} className="error-entry">
+                                            <div className="error-plugin-name">{pluginId}</div>
+                                            <div className="error-message">{error}</div>
+                                            <div className="error-timestamp">{new Date().toLocaleTimeString()}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="no-errors">No errors to display</div>
+                            )}
+                        </div>
+                        <div className="error-log-footer">
+                            <div className="error-log-help">
+                                <strong>Common Issues:</strong>
+                                <ul>
+                                    <li>Missing export statement: Add `export default ClassName;` at end of file</li>
+                                    <li>Invalid plugin interface: Ensure all required methods are implemented</li>
+                                    <li>Syntax errors: Check console for detailed JavaScript errors</li>
+                                    <li>Import issues: Remove ES6 imports - dependencies are injected</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
             </div>
         </div>
     );
